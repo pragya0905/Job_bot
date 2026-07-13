@@ -1,0 +1,71 @@
+@page {
+  size: Letter;
+  margin: 0.42in 0.55in;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #1a1a1a;
+  font-size: 9.4pt;
+  line-height: 1.25;
+}
+h1.name {
+  font-size: 19pt;
+  margin: 0 0 2pt 0;
+  font-weight: 700;
+  color: #14213d;
+}
+.contact {
+  font-size: 8.8pt;
+  color: #444;
+  margin-bottom: 9pt;
+}
+.contact a, .contact span {
+  color: #14213d;
+}
+.contact a {
+  text-decoration: underline;
+}
+.contact a:not(:last-child)::after,
+.contact span:not(:last-child)::after {
+  content: " \2022 ";
+  color: #999;
+  text-decoration: none;
+}
+h2.section {
+  font-size: 11pt;
+  font-variant: small-caps;
+  letter-spacing: 0.3pt;
+  color: #14213d;
+  border-bottom: 1pt solid #14213d;
+  margin: 6pt 0 3pt 0;
+  padding-bottom: 1pt;
+}
+.summary { margin-bottom: 1pt; }
+.entry { margin-bottom: 4pt; }
+.entry-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+.tag {
+  font-weight: 400;
+  font-style: italic;
+  color: #555;
+  font-size: 9pt;
+}
+.entry-sub {
+  display: flex;
+  justify-content: space-between;
+  font-style: italic;
+  color: #333;
+  font-size: 9pt;
+  margin-bottom: 2pt;
+}
+ul.bullets {
+  margin: 0;
+  padding-left: 13pt;
+}
+ul.bullets li { margin-bottom: 1pt; }
+.skills-list { margin: 0 0 1.5pt 0; }
+.skills-category { font-weight: 600; }

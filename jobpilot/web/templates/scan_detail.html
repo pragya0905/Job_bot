@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Scan #{{ run.id }} · JobPilot{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Scan #{{ run.id }}</h1>
+<div hx-get="/scan/{{ run.id }}/status" hx-trigger="load" hx-swap="outerHTML" id="scan-status">
+  Loading…
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Run Scan · JobPilot{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Run Scan</h1>
+<p class="text-sm text-slate-500 mb-6">Manually triggered — collects new postings from your company watchlist and job boards, filters them, scores fit with a local model, and drafts tailored resumes for the strong matches.</p>
+
+<form method="post" action="/scan/run" class="mb-8 space-y-3">
+  <div class="flex items-center gap-6 text-sm text-slate-600">
+    <label class="flex items-center gap-2">
+      <input type="checkbox" name="include_linkedin" {{ "checked" if config.sources.linkedin.enabled }} />
+      Include LinkedIn (fragile, best-effort)
+    </label>
+    <label class="flex items-center gap-2">
+      <input type="checkbox" name="include_indeed" {{ "checked" if config.sources.indeed.enabled }} />
+      Include Indeed (fragile, best-effort)
+    </label>
+  </div>
+  <button type="submit" class="bg-emerald-600 text-white px-5 py-2.5 rounded font-medium">Run Scan Now</button>
+</form>
+
+<section class="bg-white rounded-lg shadow p-5">
+  <h2 class="font-semibold text-lg mb-4">Recent runs</h2>
+  {% if runs %}
+  <table class="w-full text-sm">
+    <thead class="text-left text-slate-500 border-b">
+      <tr><th class="py-2">Started</th><th>Status</th><th>Collected</th><th>Filtered</th><th>Scored</th><th>Tailored</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr class="border-b last:border-0">
+        <td class="py-2">{{ run.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ run.status }}</td>
+        <td>{{ run.jobs_collected }}</td>
+        <td>{{ run.jobs_filtered }}</td>
+        <td>{{ run.jobs_scored }}</td>
+        <td>{{ run.jobs_tailored }}</td>
+        <td class="space-x-2">
+          <a href="/scan/{{ run.id }}" class="text-blue-600 hover:underline">view</a>
+          {% if run.status != "running" %}
+          <form method="post" action="/scan/{{ run.id }}/delete" class="inline" onsubmit="return confirm('Delete this scan run? This only removes the run record, not the jobs it found.');">
+            <button class="text-red-600 hover:underline">delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-slate-500 text-sm">No scans yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

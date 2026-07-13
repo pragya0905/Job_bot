@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>{{ css }}</style>
+</head>
+<body>
+  <h1 class="name">{{ profile.full_name }}</h1>
+  <div class="contact">
+    {% for item in contact_items %}
+    {% if item.href %}<a href="{{ item.href }}">{{ item.label }}</a>{% else %}<span>{{ item.label }}</span>{% endif %}
+    {% endfor %}
+  </div>
+
+  {% if summary %}
+  <h2 class="section">Summary</h2>
+  <p class="summary">{{ summary }}</p>
+  {% endif %}
+
+  {% if skills_emphasis %}
+  <h2 class="section">Skills</h2>
+  {% for cat in skills_emphasis %}
+  <p class="skills-list"><span class="skills-category">{{ cat.category }}:</span> {{ cat.skills|join(', ') }}</p>
+  {% endfor %}
+  {% endif %}
+
+  {% if experience %}
+  <h2 class="section">Experience</h2>
+  {% for e in experience %}
+  <div class="entry">
+    <div class="entry-header"><span>{{ e.title }}{% if e.is_internship %} <span class="tag">(Intern)</span>{% endif %}</span><span>{{ e.dates }}</span></div>
+    <div class="entry-sub"><span>{{ e.company }}</span><span>{{ e.location }}</span></div>
+    {% if e.bullets %}
+    <ul class="bullets">
+      {% for b in e.bullets %}<li>{{ b }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if projects %}
+  <h2 class="section">Projects</h2>
+  {% for p in projects %}
+  <div class="entry">
+    <div class="entry-header"><span>{{ p.name }}</span></div>
+    {% if p.tech %}<div class="entry-sub"><span>{{ p.tech|join(', ') }}</span></div>{% endif %}
+    <p>{{ p.description }}</p>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if education %}
+  <h2 class="section">Education</h2>
+  {% for ed in education %}
+  <div class="entry">
+    <div class="entry-header"><span>{{ ed.degree }}{% if ed.field %}, {{ ed.field }}{% endif %}</span><span>{{ ed.start_date }} - {{ ed.end_date }}</span></div>
+    <div class="entry-sub"><span>{{ ed.school }}</span></div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if certifications %}
+  <h2 class="section">Certifications</h2>
+  {% for c in certifications %}
+  <div class="entry">
+    <div class="entry-header"><span>{{ c.name }}{% if c.issuer %} — {{ c.issuer }}{% endif %}</span><span>{{ c.date }}</span></div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</body>
+</html>

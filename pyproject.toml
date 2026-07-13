@@ -1,0 +1,42 @@
+[project]
+name = "jobpilot"
+version = "0.1.0"
+description = "Local daily job-matching and resume-tailoring system"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlmodel",
+    "jinja2",
+    "python-multipart",
+    "httpx",
+    "beautifulsoup4",
+    "lxml",
+    "feedparser",
+    "ollama",
+    "pydantic",
+    "PyYAML",
+    "weasyprint",
+    "python-dateutil",
+    "tenacity",
+    "bcrypt",
+    "itsdangerous",
+    "psutil",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "respx",
+]
+
+[project.scripts]
+jobpilot = "jobpilot.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["jobpilot*"]

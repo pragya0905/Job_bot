@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Jobs · JobPilot{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Jobs</h1>
+
+<form method="get" action="/jobs" class="mb-4 bg-white rounded-lg shadow p-4 space-y-3">
+  <div class="flex flex-wrap items-end gap-3">
+    <label class="block">
+      <span class="text-xs text-slate-500">Search title / company</span>
+      <input type="text" name="q" value="{{ q }}" placeholder="e.g. Backend, Stripe" class="mt-1 border rounded px-2 py-1.5 text-sm w-44" />
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500">Location</span>
+      <select name="location" class="mt-1 border rounded px-2 py-1.5 text-sm max-w-56">
+        <option value="" {{ "selected" if not location }}>Any</option>
+        {% for loc in all_locations %}
+        <option value="{{ loc }}" {{ "selected" if location == loc }}>{{ loc }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500">Min score</span>
+      <input type="number" name="min_score" value="{{ min_score }}" min="0" max="100" class="mt-1 border rounded px-2 py-1.5 text-sm w-20" />
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500">Status</span>
+      <select name="status" class="mt-1 border rounded px-2 py-1.5 text-sm">
+        <option value="" {{ "selected" if not status }}>Any</option>
+        <option value="new" {{ "selected" if status == "new" }}>New</option>
+        <option value="scored" {{ "selected" if status == "scored" }}>Scored</option>
+        <option value="tailored" {{ "selected" if status == "tailored" }}>Tailored</option>
+        <option value="needs_review" {{ "selected" if status == "needs_review" }}>Needs review</option>
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500">Application</span>
+      <select name="applied" class="mt-1 border rounded px-2 py-1.5 text-sm">
+        <option value="" {{ "selected" if not applied }}>Any</option>
+        <option value="not_applied" {{ "selected" if applied == "not_applied" }}>Not applied</option>
+        <option value="applied" {{ "selected" if applied == "applied" }}>Applied</option>
+        <option value="interviewing" {{ "selected" if applied == "interviewing" }}>Interviewing</option>
+        <option value="rejected" {{ "selected" if applied == "rejected" }}>Rejected</option>
+        <option value="offer" {{ "selected" if applied == "offer" }}>Offer</option>
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-xs text-slate-500">Source</span>
+      <select name="source" class="mt-1 border rounded px-2 py-1.5 text-sm">
+        <option value="" {{ "selected" if not source }}>Any</option>
+        {% for src in all_sources %}
+        <option value="{{ src }}" {{ "selected" if source == src }}>{{ src }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="flex items-center gap-1.5 text-sm pb-1.5">
+      <input type="checkbox" name="remote_only" value="true" {{ "checked" if remote_only }} />
+      Remote only
+    </label>
+    <button class="text-sm bg-slate-800 text-white px-4 py-1.5 rounded">Filter</button>
+    {% if q or location or min_score or status or applied or source or remote_only %}
+    <a href="/jobs" class="text-sm text-blue-600 hover:underline pb-1.5">clear</a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Empty form, targeted by checkboxes/button below via the form="" attribute
+     so the per-row status <select> forms can live inside the table without
+     illegal nested <form> elements. -->
+<form id="bulk-delete-form" method="post" action="/jobs/delete" onsubmit="return confirm('Delete the selected jobs? This also removes their scores, drafts, and generated PDFs.');">
+  <input type="hidden" name="return_to" value="{{ current_url }}" />
+</form>
+
+<div class="bg-white rounded-lg shadow p-5 overflow-x-auto">
+  {% if rows %}
+  <div class="flex items-center justify-between mb-2">
+    <p class="text-xs text-slate-500">{{ rows|length }} job{{ "s" if rows|length != 1 }}</p>
+    <button type="submit" form="bulk-delete-form" class="text-xs bg-red-600 text-white px-3 py-1.5 rounded">Delete selected</button>
+  </div>
+  <table class="w-full text-sm">
+    <thead class="text-left text-slate-500 border-b">
+      <tr>
+        <th class="py-2 px-2 whitespace-nowrap"><input type="checkbox" onclick="document.querySelectorAll('.job-checkbox').forEach(cb => cb.checked = this.checked)" /></th>
+        <th class="px-2 whitespace-nowrap">#</th>
+        <th class="px-2 whitespace-nowrap">Score</th>
+        <th class="px-2">Title</th>
+        <th class="px-2">Company</th>
+        <th class="px-2">Location</th>
+        <th class="px-2 whitespace-nowrap">Source</th>
+        <th class="px-2 whitespace-nowrap">Status</th>
+        <th class="px-2 whitespace-nowrap">Applied</th>
+        <th class="px-2 whitespace-nowrap"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job, score, application in rows %}
+      <tr class="border-b last:border-0">
+        <td class="py-2 px-2 whitespace-nowrap"><input type="checkbox" class="job-checkbox" form="bulk-delete-form" name="job_ids" value="{{ job.id }}" /></td>
+        <td class="px-2 whitespace-nowrap text-slate-400">{{ loop.index }}</td>
+        <td class="px-2 whitespace-nowrap font-semibold {{ 'text-emerald-600' if score and score.score >= 75 else 'text-slate-600' }}">
+          {{ score.score if score else "—" }}
+        </td>
+        <td class="px-2">{{ job.title }}</td>
+        <td class="px-2">{{ job.company_name }}</td>
+        <td class="px-2">{{ job.location_raw }}</td>
+        <td class="px-2 whitespace-nowrap text-xs text-slate-500">{{ job.source }}</td>
+        <td class="px-2 whitespace-nowrap text-xs">{{ job.status }}</td>
+        <td class="px-2 whitespace-nowrap">
+          <form method="post" action="/jobs/{{ job.id }}/status" class="inline">
+            <input type="hidden" name="return_to" value="{{ current_url }}" />
+            <select name="status" onchange="this.form.submit()" class="border border-slate-400 bg-white text-slate-900 rounded px-2 py-1.5 text-sm w-36 font-medium">
+              {% for s in application_statuses %}
+              <option value="{{ s }}" {{ "selected" if (application.status if application else "not_applied") == s }}>{{ s.replace("_", " ") }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td class="px-2 whitespace-nowrap"><a href="/jobs/{{ job.id }}" class="text-blue-600 hover:underline">view</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-slate-500 text-sm">No jobs match these filters. <a href="/jobs" class="text-blue-600 hover:underline">Clear filters</a> or <a href="/scan" class="text-blue-600 hover:underline">run a scan</a>.</p>
+  {% endif %}
+</div>
+{% endblock %}

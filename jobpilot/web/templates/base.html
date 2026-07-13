@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}JobPilot{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  {% set user_email = current_user_email(request) %}
+  <nav class="bg-slate-900 text-slate-100">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
+      <a href="/" class="font-semibold text-lg">JobPilot</a>
+      {% if user_email %}
+      <a href="/" class="text-sm text-slate-300 hover:text-white">Dashboard</a>
+      <a href="/jobs" class="text-sm text-slate-300 hover:text-white">Jobs</a>
+      <a href="/companies" class="text-sm text-slate-300 hover:text-white">Companies</a>
+      <a href="/preferences" class="text-sm text-slate-300 hover:text-white">Preferences</a>
+      <a href="/profile" class="text-sm text-slate-300 hover:text-white">Profile</a>
+      <a href="/monitor" class="text-sm text-slate-300 hover:text-white">System</a>
+      <a href="/scan" class="text-sm text-slate-300 hover:text-white bg-emerald-600 px-3 py-1.5 rounded">Run Scan</a>
+      <span class="ml-auto text-sm text-slate-400">{{ user_email }}</span>
+      <form method="post" action="/logout">
+        <button class="text-sm text-slate-300 hover:text-white">Log out</button>
+      </form>
+      {% else %}
+      <a href="/login" class="ml-auto text-sm text-slate-300 hover:text-white">Log in</a>
+      <a href="/signup" class="text-sm text-slate-300 hover:text-white bg-emerald-600 px-3 py-1.5 rounded">Sign up</a>
+      {% endif %}
+    </div>
+  </nav>
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

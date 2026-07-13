@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Search Preferences · JobPilot{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Search Preferences</h1>
+<p class="text-sm text-slate-500 mb-6">Tune what JobPilot prioritizes when collecting and scoring jobs. Location is enforced during collection; sectors are a soft signal the scorer weighs into your fit score and rationale, not a hard filter (job postings don't reliably state their sector).</p>
+
+{% if saved %}
+<div id="save-banner" class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+  <span>✓ Preferences saved.</span>
+  <button type="button" onclick="document.getElementById('save-banner').remove()" class="text-emerald-700 hover:text-emerald-900 text-xs">dismiss</button>
+</div>
+<script>setTimeout(() => document.getElementById('save-banner')?.remove(), 4000);</script>
+{% endif %}
+
+<form method="post" action="/preferences" class="space-y-6">
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <h2 class="font-semibold text-lg">Location</h2>
+    <div class="space-y-2">
+      <label class="flex items-center gap-2 text-sm">
+        <input type="radio" name="location_mode" value="specific_or_remote" {{ "checked" if pref.location_mode == "specific_or_remote" }} />
+        Specific locations or remote (recommended)
+      </label>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="radio" name="location_mode" value="remote_only" {{ "checked" if pref.location_mode == "remote_only" }} />
+        Remote only — reject any on-site/hybrid posting
+      </label>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="radio" name="location_mode" value="any" {{ "checked" if pref.location_mode == "any" }} />
+        Anywhere — don't filter by location at all
+      </label>
+    </div>
+    <label class="block">
+      <span class="text-sm text-slate-600">Preferred locations (used when "Specific locations or remote" is selected)</span>
+      <select name="preferred_locations" multiple size="8" class="mt-1 w-full border rounded px-3 py-2">
+        {% for loc in location_options %}
+        <option value="{{ loc }}" {{ "selected" if loc in pref.preferred_locations }}>{{ loc }}</option>
+        {% endfor %}
+      </select>
+      <span class="text-xs text-slate-400">Cmd/Ctrl-click to select more than one.</span>
+    </label>
+    <label class="block">
+      <span class="text-sm text-slate-600">Other locations not listed above (comma separated)</span>
+      <input name="preferred_locations_other" value="{{ other_locations }}" placeholder="e.g. Coimbatore, Ahmedabad" class="mt-1 w-full border rounded px-3 py-2" />
+    </label>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <h2 class="font-semibold text-lg">Sectors / Industries</h2>
+    <label class="block">
+      <span class="text-sm text-slate-600">Prioritize these sectors (comma separated)</span>
+      <input name="preferred_sectors" value="{{ pref.preferred_sectors|join(', ') }}" placeholder="e.g. Fintech, Healthcare, Developer Tools" class="mt-1 w-full border rounded px-3 py-2" />
+    </label>
+    <label class="block">
+      <span class="text-sm text-slate-600">Deprioritize these sectors (comma separated, optional)</span>
+      <input name="avoid_sectors" value="{{ pref.avoid_sectors|join(', ') }}" placeholder="e.g. Adtech, Gambling" class="mt-1 w-full border rounded px-3 py-2" />
+    </label>
+  </section>
+
+  <button type="submit" class="bg-emerald-600 text-white px-5 py-2.5 rounded font-medium">Save preferences</button>
+</form>
+{% endblock %}

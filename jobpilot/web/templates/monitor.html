@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}System · JobPilot{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">System</h1>
+<p class="text-sm text-slate-500 mb-6">Live CPU, memory, and Ollama model usage on this machine — useful for knowing when a scan is actually working vs. stalled, and whether a model is still loaded/warm.</p>
+
+<div hx-get="/monitor/status" hx-trigger="load, every 3s" hx-swap="outerHTML" id="monitor-status">
+  Loading…
+</div>
+{% endblock %}

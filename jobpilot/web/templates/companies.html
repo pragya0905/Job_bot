@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Companies · JobPilot{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Company Watchlist</h1>
+<p class="text-sm text-slate-500 mb-6">Companies whose ATS job boards (Greenhouse, Lever, Ashby) JobPilot checks on each scan.</p>
+
+<section class="bg-white rounded-lg shadow p-5 mb-8">
+  <h2 class="font-semibold mb-3">Add a company</h2>
+  <form method="post" action="/companies" class="flex gap-3 items-end flex-wrap">
+    <label class="block">
+      <span class="text-sm text-slate-600">Name</span>
+      <input name="name" required class="mt-1 border rounded px-3 py-2" />
+    </label>
+    <label class="block">
+      <span class="text-sm text-slate-600">ATS type</span>
+      <select name="ats_type" class="mt-1 border rounded px-3 py-2">
+        <option value="greenhouse">Greenhouse</option>
+        <option value="lever">Lever</option>
+        <option value="ashby">Ashby</option>
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-sm text-slate-600">Board slug</span>
+      <input name="ats_slug" required placeholder="e.g. company token from their board URL" class="mt-1 border rounded px-3 py-2 w-64" />
+    </label>
+    <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded font-medium">Add</button>
+  </form>
+</section>
+
+<section class="bg-white rounded-lg shadow p-5">
+  <table class="w-full text-sm">
+    <thead class="text-left text-slate-500 border-b">
+      <tr><th class="py-2">Name</th><th>ATS</th><th>Slug</th><th>Enabled</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for c in companies %}
+      <tr class="border-b last:border-0">
+        <td class="py-2">{{ c.name }}</td>
+        <td>{{ c.ats_type }}</td>
+        <td class="font-mono text-xs">{{ c.ats_slug }}</td>
+        <td>{{ "yes" if c.enabled else "no" }}</td>
+        <td class="space-x-2">
+          <form method="post" action="/companies/{{ c.id }}/toggle" class="inline">
+            <button class="text-blue-600 hover:underline">{{ "disable" if c.enabled else "enable" }}</button>
+          </form>
+          <form method="post" action="/companies/{{ c.id }}/delete" class="inline">
+            <button class="text-red-600 hover:underline">remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not companies %}
+  <p class="text-slate-500 text-sm">No companies yet — add one above.</p>
+  {% endif %}
+</section>
+{% endblock %}

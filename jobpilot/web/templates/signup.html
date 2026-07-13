@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Sign up · JobPilot{% endblock %}
+{% block content %}
+<div class="max-w-sm mx-auto mt-12">
+  <h1 class="text-2xl font-semibold mb-6 text-center">Create your JobPilot account</h1>
+  <div class="bg-white rounded-lg shadow p-6">
+    {% if error %}
+    <p class="text-sm text-red-600 mb-4">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/signup" class="space-y-4">
+      <label class="block">
+        <span class="text-sm text-slate-600">Email</span>
+        <input type="email" name="email" required class="mt-1 w-full border rounded px-3 py-2" />
+      </label>
+      <label class="block">
+        <span class="text-sm text-slate-600">Password (min 8 characters)</span>
+        <input type="password" name="password" required minlength="8" class="mt-1 w-full border rounded px-3 py-2" />
+      </label>
+      <label class="block">
+        <span class="text-sm text-slate-600">Confirm password</span>
+        <input type="password" name="confirm_password" required minlength="8" class="mt-1 w-full border rounded px-3 py-2" />
+      </label>
+      <button type="submit" class="w-full bg-emerald-600 text-white px-4 py-2.5 rounded font-medium">Sign up</button>
+    </form>
+    <p class="text-sm text-slate-500 mt-4 text-center">Already have an account? <a href="/login" class="text-blue-600 hover:underline">Log in</a></p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Profile · JobPilot{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Your Profile</h1>
+<p class="text-sm text-slate-500 mb-6">This is the source of truth for your resume content. JobPilot only reorders and rewords what's here when tailoring drafts — it never invents experience.</p>
+
+{% if saved %}
+<div id="save-banner" class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+  <span>✓ Profile saved.</span>
+  <button type="button" onclick="document.getElementById('save-banner').remove()" class="text-emerald-700 hover:text-emerald-900 text-xs">dismiss</button>
+</div>
+<script>setTimeout(() => document.getElementById('save-banner')?.remove(), 4000);</script>
+{% endif %}
+
+<form method="post" action="/profile" class="space-y-8">
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <h2 class="font-semibold text-lg">Basics</h2>
+    <div class="grid grid-cols-2 gap-4">
+      <label class="block">
+        <span class="text-sm text-slate-600">Full name</span>
+        <input name="full_name" value="{{ profile.full_name }}" class="mt-1 w-full border rounded px-3 py-2" />
+      </label>
+      <label class="block">
+        <span class="text-sm text-slate-600">Email</span>
+        <input name="email" value="{{ profile.email }}" class="mt-1 w-full border rounded px-3 py-2" />
+      </label>
+      <label class="block">
+        <span class="text-sm text-slate-600">Phone</span>
+        <input name="phone" value="{{ profile.phone }}" class="mt-1 w-full border rounded px-3 py-2" />
+      </label>
+      <label class="block">
+        <span class="text-sm text-slate-600">Location</span>
+        <input name="location" value="{{ profile.location }}" class="mt-1 w-full border rounded px-3 py-2" />
+      </label>
+    </div>
+    <label class="block">
+      <span class="text-sm text-slate-600">Links (one per line — LinkedIn, GitHub, portfolio, ...)</span>
+      <textarea name="links" rows="3" class="mt-1 w-full border rounded px-3 py-2">{{ profile.links|join('\n') }}</textarea>
+    </label>
+    <label class="block">
+      <span class="text-sm text-slate-600">Summary (your current/base summary — JobPilot rewrites a tailored copy per job, this one stays as your default)</span>
+      <textarea name="summary" rows="3" class="mt-1 w-full border rounded px-3 py-2">{{ profile.summary }}</textarea>
+    </label>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Skills</h2>
+      <button type="button" onclick="addRow('skill')" class="text-sm bg-slate-800 text-white px-3 py-1.5 rounded">+ Add category</button>
+    </div>
+    <p class="text-xs text-slate-500">Group your skills so tailored resumes can emphasize the right category per job (e.g. Languages, Frameworks, Cloud &amp; DevOps, Databases).</p>
+    <div id="skill-rows" class="space-y-3">
+      {% for cat in skill_categories %}
+      <div class="row border rounded p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Category</span>
+          <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <input name="skillcat_category" placeholder="Category (e.g. Languages)" value="{{ cat.category }}" class="border rounded px-3 py-2" />
+          <input name="skillcat_items" placeholder="Skills (comma separated)" value="{{ cat.skills|join(', ') }}" class="col-span-2 border rounded px-3 py-2" />
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Experience</h2>
+      <button type="button" onclick="addRow('experience')" class="text-sm bg-slate-800 text-white px-3 py-1.5 rounded">+ Add role</button>
+    </div>
+    <div id="experience-rows" class="space-y-4">
+      {% for exp in experience %}
+      <div class="row border rounded p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Role</span>
+          <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <input name="exp_company" placeholder="Company" value="{{ exp.company }}" class="border rounded px-3 py-2" />
+          <input name="exp_title" placeholder="Title" value="{{ exp.title }}" class="border rounded px-3 py-2" />
+          <input name="exp_location" placeholder="Location" value="{{ exp.location }}" class="border rounded px-3 py-2" />
+          <div class="grid grid-cols-2 gap-3">
+            <input name="exp_start_date" placeholder="Start (e.g. Jan 2022)" value="{{ exp.start_date }}" class="border rounded px-3 py-2" />
+            <input name="exp_end_date" placeholder="End (e.g. Present)" value="{{ exp.end_date }}" class="border rounded px-3 py-2" />
+          </div>
+          <textarea name="exp_bullets" placeholder="One bullet per line" rows="4" class="col-span-2 border rounded px-3 py-2">{{ exp.bullets|join('\n') }}</textarea>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Internships</h2>
+      <button type="button" onclick="addRow('internship')" class="text-sm bg-slate-800 text-white px-3 py-1.5 rounded">+ Add internship</button>
+    </div>
+    <div id="internship-rows" class="space-y-4">
+      {% for intern in internships %}
+      <div class="row border rounded p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Internship</span>
+          <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <input name="intern_company" placeholder="Company" value="{{ intern.company }}" class="border rounded px-3 py-2" />
+          <input name="intern_title" placeholder="Title" value="{{ intern.title }}" class="border rounded px-3 py-2" />
+          <input name="intern_location" placeholder="Location" value="{{ intern.location }}" class="border rounded px-3 py-2" />
+          <div class="grid grid-cols-2 gap-3">
+            <input name="intern_start_date" placeholder="Start" value="{{ intern.start_date }}" class="border rounded px-3 py-2" />
+            <input name="intern_end_date" placeholder="End" value="{{ intern.end_date }}" class="border rounded px-3 py-2" />
+          </div>
+          <textarea name="intern_bullets" placeholder="One bullet per line" rows="3" class="col-span-2 border rounded px-3 py-2">{{ intern.bullets|join('\n') }}</textarea>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Projects</h2>
+      <button type="button" onclick="addRow('project')" class="text-sm bg-slate-800 text-white px-3 py-1.5 rounded">+ Add project</button>
+    </div>
+    <div id="project-rows" class="space-y-4">
+      {% for proj in projects %}
+      <div class="row border rounded p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Project</span>
+          <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <input name="proj_name" placeholder="Project name" value="{{ proj.name }}" class="border rounded px-3 py-2" />
+          <input name="proj_link" placeholder="Link" value="{{ proj.link }}" class="border rounded px-3 py-2" />
+          <input name="proj_tech" placeholder="Tech (comma separated)" value="{{ proj.tech|join(', ') }}" class="col-span-2 border rounded px-3 py-2" />
+          <textarea name="proj_description" placeholder="Description" rows="2" class="col-span-2 border rounded px-3 py-2">{{ proj.description }}</textarea>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Education</h2>
+      <button type="button" onclick="addRow('education')" class="text-sm bg-slate-800 text-white px-3 py-1.5 rounded">+ Add education</button>
+    </div>
+    <div id="education-rows" class="space-y-4">
+      {% for edu in education %}
+      <div class="row border rounded p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Education</span>
+          <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <input name="edu_school" placeholder="School" value="{{ edu.school }}" class="border rounded px-3 py-2" />
+          <input name="edu_degree" placeholder="Degree" value="{{ edu.degree }}" class="border rounded px-3 py-2" />
+          <input name="edu_field" placeholder="Field of study" value="{{ edu.field }}" class="border rounded px-3 py-2" />
+          <div class="grid grid-cols-2 gap-3">
+            <input name="edu_start_date" placeholder="Start" value="{{ edu.start_date }}" class="border rounded px-3 py-2" />
+            <input name="edu_end_date" placeholder="End" value="{{ edu.end_date }}" class="border rounded px-3 py-2" />
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="bg-white rounded-lg shadow p-5 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-lg">Certifications</h2>
+      <button type="button" onclick="addRow('certification')" class="text-sm bg-slate-800 text-white px-3 py-1.5 rounded">+ Add certification</button>
+    </div>
+    <div id="certification-rows" class="space-y-4">
+      {% for cert in certifications %}
+      <div class="row border rounded p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Certification</span>
+          <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <input name="cert_name" placeholder="Certification name" value="{{ cert.name }}" class="border rounded px-3 py-2" />
+          <input name="cert_issuer" placeholder="Issuer (e.g. AWS)" value="{{ cert.issuer }}" class="border rounded px-3 py-2" />
+          <input name="cert_date" placeholder="Date (e.g. Mar 2024)" value="{{ cert.date }}" class="border rounded px-3 py-2" />
+          <input name="cert_url" placeholder="Credential URL (optional)" value="{{ cert.credential_url }}" class="border rounded px-3 py-2" />
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <button type="submit" class="bg-emerald-600 text-white px-5 py-2.5 rounded font-medium">Save profile</button>
+</form>
+
+<template id="tpl-skill">
+  <div class="row border rounded p-3">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Category</span>
+      <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+    </div>
+    <div class="grid grid-cols-3 gap-3">
+      <input name="skillcat_category" placeholder="Category (e.g. Languages)" class="border rounded px-3 py-2" />
+      <input name="skillcat_items" placeholder="Skills (comma separated)" class="col-span-2 border rounded px-3 py-2" />
+    </div>
+  </div>
+</template>
+<template id="tpl-experience">
+  <div class="row border rounded p-4">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Role</span>
+      <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <input name="exp_company" placeholder="Company" class="border rounded px-3 py-2" />
+      <input name="exp_title" placeholder="Title" class="border rounded px-3 py-2" />
+      <input name="exp_location" placeholder="Location" class="border rounded px-3 py-2" />
+      <div class="grid grid-cols-2 gap-3">
+        <input name="exp_start_date" placeholder="Start (e.g. Jan 2022)" class="border rounded px-3 py-2" />
+        <input name="exp_end_date" placeholder="End (e.g. Present)" class="border rounded px-3 py-2" />
+      </div>
+      <textarea name="exp_bullets" placeholder="One bullet per line" rows="4" class="col-span-2 border rounded px-3 py-2"></textarea>
+    </div>
+  </div>
+</template>
+<template id="tpl-internship">
+  <div class="row border rounded p-4">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Internship</span>
+      <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <input name="intern_company" placeholder="Company" class="border rounded px-3 py-2" />
+      <input name="intern_title" placeholder="Title" class="border rounded px-3 py-2" />
+      <input name="intern_location" placeholder="Location" class="border rounded px-3 py-2" />
+      <div class="grid grid-cols-2 gap-3">
+        <input name="intern_start_date" placeholder="Start" class="border rounded px-3 py-2" />
+        <input name="intern_end_date" placeholder="End" class="border rounded px-3 py-2" />
+      </div>
+      <textarea name="intern_bullets" placeholder="One bullet per line" rows="3" class="col-span-2 border rounded px-3 py-2"></textarea>
+    </div>
+  </div>
+</template>
+<template id="tpl-project">
+  <div class="row border rounded p-4">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Project</span>
+      <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <input name="proj_name" placeholder="Project name" class="border rounded px-3 py-2" />
+      <input name="proj_link" placeholder="Link" class="border rounded px-3 py-2" />
+      <input name="proj_tech" placeholder="Tech (comma separated)" class="col-span-2 border rounded px-3 py-2" />
+      <textarea name="proj_description" placeholder="Description" rows="2" class="col-span-2 border rounded px-3 py-2"></textarea>
+    </div>
+  </div>
+</template>
+<template id="tpl-education">
+  <div class="row border rounded p-4">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Education</span>
+      <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <input name="edu_school" placeholder="School" class="border rounded px-3 py-2" />
+      <input name="edu_degree" placeholder="Degree" class="border rounded px-3 py-2" />
+      <input name="edu_field" placeholder="Field of study" class="border rounded px-3 py-2" />
+      <div class="grid grid-cols-2 gap-3">
+        <input name="edu_start_date" placeholder="Start" class="border rounded px-3 py-2" />
+        <input name="edu_end_date" placeholder="End" class="border rounded px-3 py-2" />
+      </div>
+    </div>
+  </div>
+</template>
+<template id="tpl-certification">
+  <div class="row border rounded p-4">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-xs font-medium text-slate-400 uppercase tracking-wide">Certification</span>
+      <button type="button" onclick="this.closest('.row').remove()" class="text-xs text-red-600 hover:text-red-700">Remove</button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <input name="cert_name" placeholder="Certification name" class="border rounded px-3 py-2" />
+      <input name="cert_issuer" placeholder="Issuer (e.g. AWS)" class="border rounded px-3 py-2" />
+      <input name="cert_date" placeholder="Date (e.g. Mar 2024)" class="border rounded px-3 py-2" />
+      <input name="cert_url" placeholder="Credential URL (optional)" class="border rounded px-3 py-2" />
+    </div>
+  </div>
+</template>
+
+<script>
+function addRow(kind) {
+  const tpl = document.getElementById('tpl-' + kind);
+  const container = document.getElementById(kind + '-rows');
+  const clone = tpl.content.cloneNode(true);
+  container.appendChild(clone);
+}
+</script>
+{% endblock %}

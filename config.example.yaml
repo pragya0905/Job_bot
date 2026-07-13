@@ -1,0 +1,60 @@
+# Copy this to config.yaml and edit. config.yaml itself is gitignored.
+
+database_path: "data/jobpilot.db"
+resume_dir: "data/resumes"
+
+# Company watchlists (which companies' Greenhouse/Lever/Ashby boards to poll)
+# are managed per-user in the app itself at /companies, not here.
+
+# Job-board sources that need no per-company config.
+sources:
+  remoteok:
+    enabled: true
+  weworkremotely:
+    enabled: true
+  linkedin:
+    enabled: false
+  indeed:
+    enabled: false
+
+filters:
+  title_keywords:
+    - "software engineer"
+    - "swe"
+    - "sde"
+    - "backend engineer"
+    - "full stack engineer"
+    - "full-stack engineer"
+    - "fullstack engineer"
+    - "frontend engineer"
+    - "front-end engineer"
+    - "software developer"
+    - "developer"
+    - "devops engineer"
+    - "site reliability engineer"
+    - "platform engineer"
+    - "cloud engineer"
+    - "infrastructure engineer"
+    - "systems engineer"
+    - "mobile engineer"
+    - "android engineer"
+    - "ios engineer"
+    - "qa engineer"
+    - "sdet"
+    - "web engineer"
+    - "application engineer"
+  locations:
+    - "hyderabad"
+    - "remote"
+
+scoring:
+  model: "gemma3:4b"
+  temperature: 0.0
+
+tailoring:
+  score_threshold: 75
+  model: "gemma4:26b"
+  temperature: 0.2
+
+ollama:
+  host: "http://localhost:11434"
