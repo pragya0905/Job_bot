@@ -5,10 +5,11 @@ from sqlmodel import Session, select
 
 from jobpilot.config import AppConfig, get_config
 from jobpilot.db import get_session
+from jobpilot.llm.client import unload_model
 from jobpilot.models import Job, JobPreference, ScanRun
 from jobpilot.pipeline.collect import collect_all
-from jobpilot.pipeline.filter import passes_filters
-from jobpilot.pipeline.progress import log_progress
+from jobpilot.pipeline.filter import passes_filters, search_locations_for
+from jobpilot.pipeline.progress import is_cancelled, log_progress
 
 logger = logging.getLogger("jobpilot.runner")
 
@@ -20,9 +21,14 @@ def collect_and_filter(session: Session, config: AppConfig, scan_run: ScanRun) -
     """
     user_id = scan_run.user_id
     preference = session.exec(select(JobPreference).where(JobPreference.user_id == user_id)).first()
+    search_locations = search_locations_for(config.filters, preference)
 
-    log_progress(session, scan_run, "Starting collection...")
-    raw_jobs, errors = collect_all(session, config, user_id, scan_run)
+    log_progress(
+        session,
+        scan_run,
+        f"Starting collection... (LinkedIn/Indeed will search: {', '.join(search_locations) or '(none configured)'})",
+    )
+    raw_jobs, errors = collect_all(session, config, user_id, scan_run, search_locations=search_locations)
     scan_run.jobs_collected = len(raw_jobs)
     if errors:
         scan_run.error_log = "\n".join(errors)
@@ -36,13 +42,24 @@ def collect_and_filter(session: Session, config: AppConfig, scan_run: ScanRun) -
         f"Filtered {len(raw_jobs)} collected down to {len(filtered)} matching title/location criteria.",
     )
 
-    existing_hashes = set(session.exec(select(Job.dedupe_hash).where(Job.user_id == user_id)).all())
+    existing_jobs_by_hash = {
+        job.dedupe_hash: job
+        for job in session.exec(select(Job).where(Job.user_id == user_id)).all()
+    }
+    now = datetime.utcnow()
     new_jobs: list[Job] = []
+    reseen_count = 0
     for raw in filtered:
         dedupe_hash = raw.dedupe_hash
-        if dedupe_hash in existing_hashes:
+        existing = existing_jobs_by_hash.get(dedupe_hash)
+        if existing is not None:
+            # Still showing up in a fresh collection pass — bump last_seen_at
+            # so staleness (computed from how long it's been since a job was
+            # last seen at all) doesn't fire for postings that are still live.
+            existing.last_seen_at = now
+            session.add(existing)
+            reseen_count += 1
             continue
-        existing_hashes.add(dedupe_hash)
         job = Job(
             user_id=user_id,
             source=raw.source,
@@ -54,18 +71,26 @@ def collect_and_filter(session: Session, config: AppConfig, scan_run: ScanRun) -
             url=raw.url,
             description_text=raw.description_text,
             posted_at=raw.posted_at,
-            collected_at=datetime.utcnow(),
+            collected_at=now,
+            last_seen_at=now,
             dedupe_hash=dedupe_hash,
             status="new",
+            salary_raw=raw.salary_raw,
         )
         session.add(job)
+        existing_jobs_by_hash[dedupe_hash] = job
         new_jobs.append(job)
 
     session.commit()
     for job in new_jobs:
         session.refresh(job)
 
-    log_progress(session, scan_run, f"{len(new_jobs)} of those are new (not already collected before).")
+    log_progress(
+        session,
+        scan_run,
+        f"{len(new_jobs)} of those are new (not already collected before); "
+        f"{reseen_count} already-known posting(s) are still live.",
+    )
     return new_jobs
 
 
@@ -96,10 +121,18 @@ async def run_scan(scan_run_id: int, include_linkedin: bool = False, include_ind
             collect_and_filter(session, config, scan_run)
             user_id = scan_run.user_id
 
+            if is_cancelled(session, scan_run):
+                log_progress(session, scan_run, "Cancelled after collection — skipping scoring and tailoring.")
+                scan_run.status = "cancelled"
+                return
+
             # Score every unscored job for this user, not just this run's new
-            # arrivals — covers jobs left over from an interrupted previous run.
+            # arrivals — covers jobs left over from an interrupted previous
+            # run, and also retries jobs stuck in needs_review from a prior
+            # scoring failure (a flaky LLM call otherwise loses them for good,
+            # since nothing else ever revisits that status).
             unscored_jobs = session.exec(
-                select(Job).where(Job.user_id == user_id, Job.status == "new")
+                select(Job).where(Job.user_id == user_id, Job.status.in_(["new", "needs_review"]))
             ).all()
 
             from jobpilot.pipeline.score import score_jobs
@@ -109,33 +142,44 @@ async def run_scan(scan_run_id: int, include_linkedin: bool = False, include_ind
             scored = await score_jobs(session, config, unscored_jobs, user_id, scan_run)
             scan_run.jobs_scored = len(scored)
 
+            if is_cancelled(session, scan_run):
+                log_progress(session, scan_run, "Cancelled after scoring — skipping tailoring.")
+                scan_run.status = "cancelled"
+                await unload_model(config.ollama.host, config.scoring.model)
+                return
+
             # Tailor every scored-but-not-yet-tailored job above threshold for
             # this user, not just this run's batch — same reasoning as scoring.
             pending_tailoring = session.exec(
                 select(Job).where(Job.user_id == user_id, Job.status == "scored")
             ).all()
 
-            from jobpilot.pipeline.tailor import tailor_strong_matches
+            from jobpilot.pipeline.tailor import get_score_threshold, tailor_strong_matches
 
+            threshold = get_score_threshold(session, config, user_id)
             scan_run.stage = "tailoring"
             log_progress(
                 session,
                 scan_run,
-                f"Tailoring drafts for jobs scoring ≥{config.tailoring.score_threshold} "
-                f"({len(pending_tailoring)} candidates)...",
+                f"Tailoring drafts for jobs scoring ≥{threshold} ({len(pending_tailoring)} candidates)...",
             )
             tailored = await tailor_strong_matches(session, config, pending_tailoring, user_id, scan_run)
             scan_run.jobs_tailored = len(tailored)
 
-            scan_run.stage = "done"
-            scan_run.status = "completed"
-            log_progress(session, scan_run, "Scan complete.", current_item="")
+            if is_cancelled(session, scan_run):
+                scan_run.status = "cancelled"
+                await unload_model(config.ollama.host, config.tailoring.model)
+            else:
+                scan_run.stage = "done"
+                scan_run.status = "completed"
+                log_progress(session, scan_run, "Scan complete.", current_item="")
         except Exception as exc:  # noqa: BLE001 — surface the failure in the UI, don't crash the process
             logger.exception("scan run %s failed", scan_run_id)
             scan_run.status = "failed"
             scan_run.error_log = (scan_run.error_log + "\n" if scan_run.error_log else "") + f"FATAL: {exc}"
             log_progress(session, scan_run, f"FAILED: {exc}", current_item="")
         finally:
+            scan_run.current_item = ""
             scan_run.finished_at = datetime.utcnow()
             session.add(scan_run)
             session.commit()

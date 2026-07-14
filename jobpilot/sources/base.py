@@ -22,6 +22,7 @@ class RawJob(BaseModel):
     url: str = ""
     description_text: str = ""
     posted_at: Optional[datetime] = None
+    salary_raw: str = ""
 
     @property
     def dedupe_hash(self) -> str:

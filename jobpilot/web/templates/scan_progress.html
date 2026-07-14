@@ -1,35 +1,58 @@
 <div id="scan-status"
-     {% if run.status == "running" %}hx-get="/scan/{{ run.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}
-     class="bg-white rounded-lg shadow p-5 space-y-3">
+     {% if run.status == "running" %}hx-get="/scan/{{ run.id }}/status{% if q %}?q={{ q }}{% endif %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}
+     class="card p-5 space-y-4">
   <div class="flex items-center gap-3">
-    <span class="text-sm font-medium">Status:</span>
-    <span class="px-2 py-0.5 rounded text-xs font-medium
-      {{ 'bg-amber-100 text-amber-800' if run.status == 'running' else 'bg-emerald-100 text-emerald-800' if run.status == 'completed' else 'bg-red-100 text-red-800' }}">
+    <span class="text-sm font-medium text-slate-700">Status:</span>
+    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium
+      {{ 'bg-amber-100 text-amber-700' if run.status == 'running' else 'bg-emerald-100 text-emerald-700' if run.status == 'completed' else 'bg-slate-200 text-slate-600' if run.status == 'cancelled' else 'bg-red-100 text-red-700' }}">
+      {% if run.status == "running" %}<span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>{% endif %}
       {{ run.status }}{% if run.status == "running" %} · {{ run.stage }}{% endif %}
     </span>
     {% if run.status == "running" and run.current_item %}
     <span class="text-xs text-slate-500 truncate">— {{ run.current_item }}</span>
     {% endif %}
+    {% if run.status == "running" %}
+    <form method="post" action="/scan/{{ run.id }}/cancel" class="ml-auto" onsubmit="return confirm('Stop this scan? It will finish the job currently in progress, then stop before starting the next one.');">
+      <button type="submit" {% if run.cancel_requested %}disabled{% endif %} class="btn btn-danger text-xs px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+        {{ "Cancelling…" if run.cancel_requested else "■ Cancel scan" }}
+      </button>
+    </form>
+    {% endif %}
   </div>
   <div class="grid grid-cols-4 gap-4 text-sm">
-    <div><div class="text-slate-500">Collected</div><div class="font-semibold">{{ run.jobs_collected }}</div></div>
-    <div><div class="text-slate-500">Filtered</div><div class="font-semibold">{{ run.jobs_filtered }}</div></div>
-    <div><div class="text-slate-500">Scored</div><div class="font-semibold">{{ run.jobs_scored }}</div></div>
-    <div><div class="text-slate-500">Tailored</div><div class="font-semibold">{{ run.jobs_tailored }}</div></div>
+    <div class="bg-slate-50 rounded-lg p-3"><div class="text-slate-500 text-xs mb-0.5">Collected</div><div class="font-semibold text-lg">{{ run.jobs_collected }}</div></div>
+    <div class="bg-slate-50 rounded-lg p-3"><div class="text-slate-500 text-xs mb-0.5">Filtered</div><div class="font-semibold text-lg">{{ run.jobs_filtered }}</div></div>
+    <div class="bg-slate-50 rounded-lg p-3"><div class="text-slate-500 text-xs mb-0.5">Scored</div><div class="font-semibold text-lg">{{ run.jobs_scored }}</div></div>
+    <div class="bg-slate-50 rounded-lg p-3"><div class="text-slate-500 text-xs mb-0.5">Tailored</div><div class="font-semibold text-lg">{{ run.jobs_tailored }}</div></div>
   </div>
-  {% if run.log_lines %}
+  {% if total_log_count %}
   <div>
-    <div class="text-xs text-slate-500 mb-1">Live log ({{ run.log_lines|length }} lines)</div>
-    <div id="scan-log" class="bg-slate-900 text-xs font-mono rounded p-3 h-96 overflow-y-auto leading-relaxed">
-      {% for line in run.log_lines[-200:] %}
-        {% if "✗" in line %}
-        <div class="text-red-400">{{ line }}</div>
-        {% elif "→" in line %}
-        <div class="text-emerald-400 pl-3">{{ line }}</div>
-        {% elif line.lstrip() != line %}
-        <div class="text-slate-400 pl-3">{{ line }}</div>
+    <div class="flex items-center justify-between mb-1.5 gap-3 flex-wrap">
+      <div class="text-xs text-slate-500 font-medium">
+        {% if q %}Log — {{ log_entries|length }} of {{ total_log_count }} line{{ 's' if total_log_count != 1 }} match "{{ q }}"
+        {% else %}Full log ({{ total_log_count }} line{{ 's' if total_log_count != 1 }}){% endif %}
+      </div>
+      <form method="get" action="/scan/{{ run.id }}" class="flex gap-1.5">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search log…" class="input px-2 py-1 text-xs w-48" />
+        <button type="submit" class="btn btn-secondary text-xs px-2.5 py-1">Search</button>
+        {% if q %}<a href="/scan/{{ run.id }}" class="btn btn-ghost text-xs px-2 py-1">clear</a>{% endif %}
+      </form>
+    </div>
+    {% if log_entries %}
+    <div id="scan-log" class="bg-slate-900 text-xs font-mono rounded-lg p-3 h-96 overflow-y-auto leading-relaxed">
+      {% for entry in log_entries %}
+        {% if "✗" in entry.message %}
+        <div class="text-red-400">{{ entry.message }}</div>
+        {% elif "⚠" in entry.message %}
+        <div class="text-amber-400 pl-3">{{ entry.message }}</div>
+        {% elif "→" in entry.message %}
+        <div class="text-emerald-400 pl-3">{{ entry.message }}</div>
+        {% elif "↳" in entry.message %}
+        <div class="text-sky-400 pl-6">{{ entry.message }}</div>
+        {% elif entry.message.lstrip() != entry.message %}
+        <div class="text-slate-400 pl-3">{{ entry.message }}</div>
         {% else %}
-        <div class="text-slate-100 font-medium">{{ line }}</div>
+        <div class="text-slate-100 font-medium">{{ entry.message }}</div>
         {% endif %}
       {% endfor %}
     </div>
@@ -39,22 +62,25 @@
         if (el) { el.scrollTop = el.scrollHeight; }
       })();
     </script>
+    {% else %}
+    <div class="bg-slate-900 text-xs font-mono rounded-lg p-4 text-slate-500">No log lines match "{{ q }}".</div>
+    {% endif %}
   </div>
   {% endif %}
   {% if run.error_log %}
   <details class="text-xs text-slate-600">
-    <summary class="cursor-pointer text-amber-700">Source warnings / errors</summary>
-    <pre class="whitespace-pre-wrap mt-2 bg-slate-50 p-3 rounded">{{ run.error_log }}</pre>
+    <summary class="cursor-pointer text-amber-700 font-medium">Source warnings / errors</summary>
+    <pre class="whitespace-pre-wrap mt-2 bg-slate-50 p-3 rounded-lg">{{ run.error_log }}</pre>
   </details>
   {% endif %}
   {% if run.status != "running" %}
-  <a href="/jobs" class="inline-block text-blue-600 hover:underline text-sm">View jobs →</a>
+  <a href="/jobs" class="btn btn-ghost text-sm">View jobs →</a>
+  {% endif %}
+
+  {% if system %}
+  <div class="pt-2">
+    <h2 class="text-sm font-semibold text-slate-500 mb-2 flex items-center gap-1.5"><span aria-hidden="true">📊</span> System</h2>
+    {% include "system_widget.html" %}
+  </div>
   {% endif %}
 </div>
-
-{% if system %}
-<div class="mt-6">
-  <h2 class="text-sm font-semibold text-slate-500 mb-2">System</h2>
-  {% include "system_widget.html" %}
-</div>
-{% endif %}

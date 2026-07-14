@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Search Preferences · JobPilot{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Search Preferences</h1>
+<h1 class="text-2xl font-bold tracking-tight mb-1">Search Preferences</h1>
 <p class="text-sm text-slate-500 mb-6">Tune what JobPilot prioritizes when collecting and scoring jobs. Location is enforced during collection; sectors are a soft signal the scorer weighs into your fit score and rationale, not a hard filter (job postings don't reliably state their sector).</p>
 
 {% if saved %}
@@ -13,49 +13,126 @@
 {% endif %}
 
 <form method="post" action="/preferences" class="space-y-6">
-  <section class="bg-white rounded-lg shadow p-5 space-y-4">
-    <h2 class="font-semibold text-lg">Location</h2>
-    <div class="space-y-2">
-      <label class="flex items-center gap-2 text-sm">
-        <input type="radio" name="location_mode" value="specific_or_remote" {{ "checked" if pref.location_mode == "specific_or_remote" }} />
-        Specific locations or remote (recommended)
+  <section class="card p-5 space-y-4">
+    <h2 class="font-semibold text-lg flex items-center gap-2"><span aria-hidden="true">📍</span> Location</h2>
+    <div class="grid gap-2">
+      <label class="flex items-start gap-3 text-sm border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50 has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50 transition-colors">
+        <input type="radio" name="location_mode" value="specific_or_remote" class="mt-0.5 text-emerald-600 focus:ring-emerald-500" {{ "checked" if pref.location_mode == "specific_or_remote" }} />
+        <span><span class="font-medium">Specific locations or remote</span> <span class="text-xs text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded ml-1">recommended</span><br /><span class="text-slate-500">Match your chosen cities, and always allow remote roles too.</span></span>
       </label>
-      <label class="flex items-center gap-2 text-sm">
-        <input type="radio" name="location_mode" value="remote_only" {{ "checked" if pref.location_mode == "remote_only" }} />
-        Remote only — reject any on-site/hybrid posting
+      <label class="flex items-start gap-3 text-sm border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50 has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50 transition-colors">
+        <input type="radio" name="location_mode" value="remote_only" class="mt-0.5 text-emerald-600 focus:ring-emerald-500" {{ "checked" if pref.location_mode == "remote_only" }} />
+        <span><span class="font-medium">Remote only</span><br /><span class="text-slate-500">Reject any on-site/hybrid posting.</span></span>
       </label>
-      <label class="flex items-center gap-2 text-sm">
-        <input type="radio" name="location_mode" value="any" {{ "checked" if pref.location_mode == "any" }} />
-        Anywhere — don't filter by location at all
+      <label class="flex items-start gap-3 text-sm border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50 has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50 transition-colors">
+        <input type="radio" name="location_mode" value="any" class="mt-0.5 text-emerald-600 focus:ring-emerald-500" {{ "checked" if pref.location_mode == "any" }} />
+        <span><span class="font-medium">Anywhere</span><br /><span class="text-slate-500">Don't filter by location at all.</span></span>
       </label>
     </div>
+    <div>
+      <span class="text-sm font-medium text-slate-700">Preferred locations</span>
+      <span class="block text-xs text-slate-400 mb-1">Used when "Specific locations or remote" is selected — type a city and pick a suggestion, or press Enter/comma to add any city as typed. Remote roles are always allowed automatically in that mode, no need to add "Remote" here.</span>
+      <div x-data='locationChipInput({{ pref.preferred_locations|tojson }}, {{ location_suggestions|tojson }})' class="mt-1">
+        <div class="flex flex-wrap gap-1.5 mb-1.5" x-show="chips.length" x-cloak>
+          <template x-for="(chip, i) in chips" :key="chip">
+            <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 text-sm px-2.5 py-1 rounded-full">
+              <span x-text="chip"></span>
+              <button type="button" @click="removeChip(i)" class="text-emerald-600 hover:text-emerald-900 font-bold leading-none">&times;</button>
+            </span>
+          </template>
+        </div>
+        <div class="relative">
+          <input
+            type="text"
+            :value="query"
+            @input="query = $event.target.value; filterSuggestions()"
+            @keydown.enter.prevent="commitQuery()"
+            @keydown.comma.prevent="commitQuery()"
+            @keydown.escape="suggestions = []"
+            @focus="filterSuggestions()"
+            @blur="setTimeout(() => suggestions = [], 150)"
+            placeholder="e.g. Hyderabad, Bangalore, Coimbatore"
+            class="input w-full px-3 py-2"
+            autocomplete="off"
+          />
+          <ul x-show="suggestions.length" x-cloak class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto text-sm">
+            <template x-for="s in suggestions" :key="s">
+              <li @mousedown.prevent="addChip(s)" class="px-3 py-1.5 cursor-pointer hover:bg-emerald-50" x-text="s"></li>
+            </template>
+          </ul>
+        </div>
+        <input type="hidden" name="preferred_locations" :value="chips.join(', ')" />
+      </div>
+    </div>
+  </section>
+
+  <section class="card p-5 space-y-4">
+    <h2 class="font-semibold text-lg flex items-center gap-2"><span aria-hidden="true">🏭</span> Sectors / Industries</h2>
     <label class="block">
-      <span class="text-sm text-slate-600">Preferred locations (used when "Specific locations or remote" is selected)</span>
-      <select name="preferred_locations" multiple size="8" class="mt-1 w-full border rounded px-3 py-2">
-        {% for loc in location_options %}
-        <option value="{{ loc }}" {{ "selected" if loc in pref.preferred_locations }}>{{ loc }}</option>
-        {% endfor %}
-      </select>
-      <span class="text-xs text-slate-400">Cmd/Ctrl-click to select more than one.</span>
+      <span class="text-sm font-medium text-slate-700">Prioritize these sectors</span>
+      <input name="preferred_sectors" value="{{ pref.preferred_sectors|join(', ') }}" placeholder="e.g. Fintech, Healthcare, Developer Tools" class="input mt-1 w-full px-3 py-2" />
     </label>
     <label class="block">
-      <span class="text-sm text-slate-600">Other locations not listed above (comma separated)</span>
-      <input name="preferred_locations_other" value="{{ other_locations }}" placeholder="e.g. Coimbatore, Ahmedabad" class="mt-1 w-full border rounded px-3 py-2" />
+      <span class="text-sm font-medium text-slate-700">Deprioritize these sectors <span class="text-slate-400 font-normal">(optional)</span></span>
+      <input name="avoid_sectors" value="{{ pref.avoid_sectors|join(', ') }}" placeholder="e.g. Adtech, Gambling" class="input mt-1 w-full px-3 py-2" />
     </label>
   </section>
 
-  <section class="bg-white rounded-lg shadow p-5 space-y-4">
-    <h2 class="font-semibold text-lg">Sectors / Industries</h2>
-    <label class="block">
-      <span class="text-sm text-slate-600">Prioritize these sectors (comma separated)</span>
-      <input name="preferred_sectors" value="{{ pref.preferred_sectors|join(', ') }}" placeholder="e.g. Fintech, Healthcare, Developer Tools" class="mt-1 w-full border rounded px-3 py-2" />
+  <section class="card p-5 space-y-4">
+    <h2 class="font-semibold text-lg flex items-center gap-2"><span aria-hidden="true">🎯</span> Scoring</h2>
+    <label class="block max-w-xs">
+      <span class="text-sm font-medium text-slate-700">Auto-tailor threshold</span>
+      <span class="block text-xs text-slate-400 mb-1">Jobs scoring at or above this fit score (0-100) automatically get a tailored draft resume during a scan. Default is {{ default_threshold }}.</span>
+      <input type="number" name="score_threshold" min="0" max="100" value="{{ pref.score_threshold }}" class="input mt-1 w-28 px-3 py-2" />
     </label>
-    <label class="block">
-      <span class="text-sm text-slate-600">Deprioritize these sectors (comma separated, optional)</span>
-      <input name="avoid_sectors" value="{{ pref.avoid_sectors|join(', ') }}" placeholder="e.g. Adtech, Gambling" class="mt-1 w-full border rounded px-3 py-2" />
+
+    <label class="flex items-start gap-3 text-sm border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50 has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50 transition-colors">
+      <input type="checkbox" name="use_semantic_scoring" value="true" class="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" {{ "checked" if pref.use_semantic_scoring }} />
+      <span>
+        <span class="font-medium">Also compute semantic similarity</span><br />
+        <span class="text-slate-500">
+          Runs a fast embedding comparison between your profile and each job description, shown alongside the fit score as an extra signal — it doesn't change the score or which jobs get auto-tailored.
+          {% if embedding_model_available %}
+          <span class="text-emerald-700">✓ {{ embedding_model }} is available.</span>
+          {% else %}
+          <span class="text-amber-700">⚠ Requires <code class="bg-slate-100 px-1 rounded">ollama pull {{ embedding_model }}</code> first — not pulled yet, so this will be skipped until it is.</span>
+          {% endif %}
+        </span>
+      </span>
     </label>
   </section>
 
-  <button type="submit" class="bg-emerald-600 text-white px-5 py-2.5 rounded font-medium">Save preferences</button>
+  <button type="submit" class="btn btn-primary px-5 py-2.5">Save preferences</button>
 </form>
+
+<script>
+function locationChipInput(initialChips, allSuggestions) {
+  return {
+    chips: initialChips.slice(),
+    query: '',
+    suggestions: [],
+    filterSuggestions() {
+      const q = this.query.trim().toLowerCase();
+      if (!q) { this.suggestions = []; return; }
+      this.suggestions = allSuggestions
+        .filter(city => city.toLowerCase().includes(q) && !this.chips.includes(city))
+        .slice(0, 8);
+    },
+    addChip(city) {
+      const trimmed = city.trim();
+      if (trimmed && !this.chips.includes(trimmed)) {
+        this.chips.push(trimmed);
+      }
+      this.query = '';
+      this.suggestions = [];
+    },
+    commitQuery() {
+      if (this.query.trim()) this.addChip(this.query);
+    },
+    removeChip(i) {
+      this.chips.splice(i, 1);
+    },
+  };
+}
+</script>
 {% endblock %}

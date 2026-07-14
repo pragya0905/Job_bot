@@ -132,6 +132,8 @@ async def profile_save(request: Request, user: User = Depends(get_current_user))
         edu_fields = form.getlist("edu_field")
         edu_starts = form.getlist("edu_start_date")
         edu_ends = form.getlist("edu_end_date")
+        edu_cgpas = form.getlist("edu_cgpa")
+        edu_courseworks = form.getlist("edu_coursework")
         for i, school in enumerate(edu_schools):
             if not school.strip():
                 continue
@@ -143,6 +145,8 @@ async def profile_save(request: Request, user: User = Depends(get_current_user))
                     field=edu_fields[i] if i < len(edu_fields) else "",
                     start_date=edu_starts[i] if i < len(edu_starts) else "",
                     end_date=edu_ends[i] if i < len(edu_ends) else "",
+                    cgpa=edu_cgpas[i] if i < len(edu_cgpas) else "",
+                    coursework=split_commas(edu_courseworks[i] if i < len(edu_courseworks) else ""),
                     order_index=i,
                 )
             )
@@ -191,9 +195,12 @@ def _save_experience_rows(session, profile_id: int, form, *, prefix: str, entry_
     starts = form.getlist(f"{prefix}_start_date")
     ends = form.getlist(f"{prefix}_end_date")
     bullets = form.getlist(f"{prefix}_bullets")
+    raw_descriptions = form.getlist(f"{prefix}_raw_description")
+    bullet_counts = form.getlist(f"{prefix}_bullet_count")
     for i, company in enumerate(companies):
         if not company.strip():
             continue
+        count_raw = bullet_counts[i] if i < len(bullet_counts) else ""
         session.add(
             ProfileExperience(
                 profile_id=profile_id,
@@ -205,6 +212,8 @@ def _save_experience_rows(session, profile_id: int, form, *, prefix: str, entry_
                 end_date=ends[i] if i < len(ends) else "",
                 order_index=i,
                 bullets=split_bullet_lines(bullets[i] if i < len(bullets) else ""),
+                raw_description=raw_descriptions[i] if i < len(raw_descriptions) else "",
+                bullet_count=int(count_raw) if count_raw.strip().isdigit() else 0,
             )
         )
 

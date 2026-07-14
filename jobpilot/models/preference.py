@@ -16,3 +16,5 @@ class JobPreference(SQLModel, table=True):
     preferred_locations: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     preferred_sectors: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     avoid_sectors: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    score_threshold: int = 75  # min fit score (0-100) that triggers auto-tailoring on scan
+    use_semantic_scoring: bool = False  # opt-in: also compute embedding similarity alongside the LLM score

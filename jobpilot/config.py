@@ -39,14 +39,20 @@ class OllamaConfig(BaseModel):
     host: str = "http://localhost:11434"
 
 
+class EmbeddingConfig(BaseModel):
+    model: str = "nomic-embed-text"
+
+
 class AppConfig(BaseModel):
     database_path: str = "data/jobpilot.db"
     resume_dir: str = "data/resumes"
+    stale_after_days: int = 14
     sources: SourcesConfig = SourcesConfig()
     filters: FiltersConfig = FiltersConfig()
     scoring: ScoringConfig = ScoringConfig()
     tailoring: TailoringConfig = TailoringConfig()
     ollama: OllamaConfig = OllamaConfig()
+    embedding: EmbeddingConfig = EmbeddingConfig()
 
     @property
     def database_abs_path(self) -> Path:

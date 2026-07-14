@@ -24,3 +24,29 @@ def split_bullet_lines(text: str) -> list[str]:
 
 def split_commas(text: str) -> list[str]:
     return [item.strip() for item in text.split(",") if item.strip()]
+
+
+def clean_location_entries(text: str, existing: list[str] | None = None) -> list[str]:
+    """Parse the Preferences page's free-text "other locations" field into a
+    deduped list of plausible city names.
+
+    Real city names vary too much (compound names, abbreviations like "NCR")
+    to validate against a fixed pattern, so this only rejects clear junk —
+    single characters, pure numbers, entries with no letters at all — and
+    dedupes case-insensitively (including against the curated location list
+    already selected) rather than enforcing a strict format.
+    """
+    seen = {loc.lower() for loc in (existing or [])}
+    cleaned: list[str] = []
+    for raw in split_commas(text):
+        candidate = " ".join(raw.split())  # collapse internal whitespace
+        if len(candidate) < 2:
+            continue
+        if not any(ch.isalpha() for ch in candidate):
+            continue
+        key = candidate.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(candidate)
+    return cleaned

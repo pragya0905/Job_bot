@@ -4,7 +4,7 @@ from sqlmodel import select
 
 from jobpilot.auth import get_current_user
 from jobpilot.db import get_session
-from jobpilot.models import CompanyWatch, User
+from jobpilot.models import CompanyWatch, SourceHealth, User
 from jobpilot.web.templates_env import templates
 
 router = APIRouter()
@@ -48,6 +48,12 @@ def companies_delete(company_id: int, user: User = Depends(get_current_user)):
     with get_session() as session:
         company = session.get(CompanyWatch, company_id)
         if company and company.user_id == user.id:
+            source_key = f"{company.ats_type}:{company.ats_slug}"
+            health = session.exec(
+                select(SourceHealth).where(SourceHealth.user_id == user.id, SourceHealth.source_key == source_key)
+            ).first()
+            if health is not None:
+                session.delete(health)
             session.delete(company)
             session.commit()
     return RedirectResponse(url="/companies", status_code=303)

@@ -4,37 +4,75 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}JobPilot{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%88%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    [x-cloak] { display: none !important; }
+    body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    ::selection { background: #a7f3d0; }
+    .btn { display: inline-flex; align-items: center; gap: 0.375rem; font-weight: 500; border-radius: 0.5rem; transition: all 0.15s ease; white-space: nowrap; }
+    .btn-primary { background: #059669; color: white; }
+    .btn-primary:hover { background: #047857; }
+    .btn-secondary { background: white; color: #334155; border: 1px solid #cbd5e1; }
+    .btn-secondary:hover { background: #f8fafc; border-color: #94a3b8; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-ghost { color: #2563eb; }
+    .btn-ghost:hover { text-decoration: underline; }
+    .card { background: white; border-radius: 0.875rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+    .input { border: 1px solid #cbd5e1; border-radius: 0.5rem; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+    .input:focus { outline: none; border-color: #059669; box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12); }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
+<body class="bg-slate-50 text-slate-900 min-h-screen antialiased">
   {% set user_email = current_user_email(request) %}
-  <nav class="bg-slate-900 text-slate-100">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
-      <a href="/" class="font-semibold text-lg">JobPilot</a>
+  {% set path = request.url.path %}
+  <nav class="bg-slate-900 text-slate-100 sticky top-0 z-10 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 flex items-center gap-1 h-14">
+      <a href="/" class="flex items-center gap-2 font-bold text-lg tracking-tight mr-4 shrink-0">
+        <span aria-hidden="true">✈️</span> JobPilot
+      </a>
       {% if user_email %}
-      <a href="/" class="text-sm text-slate-300 hover:text-white">Dashboard</a>
-      <a href="/jobs" class="text-sm text-slate-300 hover:text-white">Jobs</a>
-      <a href="/companies" class="text-sm text-slate-300 hover:text-white">Companies</a>
-      <a href="/preferences" class="text-sm text-slate-300 hover:text-white">Preferences</a>
-      <a href="/profile" class="text-sm text-slate-300 hover:text-white">Profile</a>
-      <a href="/monitor" class="text-sm text-slate-300 hover:text-white">System</a>
-      <a href="/scan" class="text-sm text-slate-300 hover:text-white bg-emerald-600 px-3 py-1.5 rounded">Run Scan</a>
-      <span class="ml-auto text-sm text-slate-400">{{ user_email }}</span>
-      <form method="post" action="/logout">
-        <button class="text-sm text-slate-300 hover:text-white">Log out</button>
-      </form>
+      {% set nav_links = [
+        ("/", "Dashboard"),
+        ("/jobs", "Jobs"),
+        ("/companies", "Companies"),
+        ("/preferences", "Preferences"),
+        ("/profile", "Profile"),
+        ("/monitor", "System"),
+      ] %}
+      {% for href, label in nav_links %}
+      <a href="{{ href }}" class="text-sm px-3 py-2 rounded-md transition-colors
+        {{ 'bg-slate-800 text-white font-medium' if (path == href or (href != '/' and path.startswith(href))) else 'text-slate-300 hover:text-white hover:bg-slate-800/60' }}">
+        {{ label }}
+      </a>
+      {% endfor %}
+      <a href="/scan" class="btn btn-primary text-sm px-3.5 py-2 ml-2">
+        <span aria-hidden="true">▶</span> Run Scan
+      </a>
+      <div class="ml-auto flex items-center gap-3">
+        <span class="hidden sm:flex items-center gap-2 text-sm text-slate-400">
+          <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center shrink-0">{{ user_email[0]|upper }}</span>
+          {{ user_email }}
+        </span>
+        <form method="post" action="/logout">
+          <button class="text-sm text-slate-400 hover:text-white transition-colors">Log out</button>
+        </form>
+      </div>
       {% else %}
-      <a href="/login" class="ml-auto text-sm text-slate-300 hover:text-white">Log in</a>
-      <a href="/signup" class="text-sm text-slate-300 hover:text-white bg-emerald-600 px-3 py-1.5 rounded">Sign up</a>
+      <div class="ml-auto flex items-center gap-3">
+        <a href="/login" class="text-sm text-slate-300 hover:text-white">Log in</a>
+        <a href="/signup" class="btn btn-primary text-sm px-3.5 py-2">Sign up</a>
+      </div>
       {% endif %}
     </div>
   </nav>
-  <main class="max-w-6xl mx-auto px-4 py-6">
+  <main class="max-w-6xl mx-auto px-4 py-8">
     {% block content %}{% endblock %}
   </main>
 </body>

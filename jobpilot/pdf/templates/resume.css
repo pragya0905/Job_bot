@@ -69,3 +69,40 @@ ul.bullets {
 ul.bullets li { margin-bottom: 1pt; }
 .skills-list { margin: 0 0 1.5pt 0; }
 .skills-category { font-weight: 600; }
+
+.cl-header-rule {
+  border: none;
+  border-top: 1pt solid #dbe0e6;
+  margin: 8pt 0 16pt 0;
+}
+.cl-body {
+  font-size: 10.5pt;
+  line-height: 1.55;
+}
+.cl-date {
+  text-align: right;
+  color: #666;
+  margin: 0 0 18pt 0;
+}
+.cl-salutation {
+  font-weight: 600;
+  color: #14213d;
+  margin: 0 0 12pt 0;
+}
+.cl-paragraph {
+  margin: 0 0 12pt 0;
+  text-align: left;
+}
+.cl-signoff {
+  margin-top: 16pt;
+}
+.cl-signoff .cl-closing {
+  display: block;
+  margin-bottom: 4pt;
+}
+.cl-signoff .cl-name {
+  display: block;
+  font-weight: 700;
+  color: #14213d;
+  font-size: 11pt;
+}

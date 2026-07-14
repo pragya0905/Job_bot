@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>{{ css }}</style>
+</head>
+<body>
+  <h1 class="name">{{ profile.full_name }}</h1>
+  <div class="contact">
+    {% for item in contact_items %}
+    {% if item.href %}<a href="{{ item.href }}">{{ item.label }}</a>{% else %}<span>{{ item.label }}</span>{% endif %}
+    {% endfor %}
+  </div>
+  <hr class="cl-header-rule" />
+
+  <div class="cl-body">
+    <p class="cl-date">{{ today }}</p>
+
+    <p class="cl-salutation">Dear {{ company_name }} Hiring Team,</p>
+
+    {% for paragraph in paragraphs %}
+    <p class="cl-paragraph">{{ paragraph }}</p>
+    {% endfor %}
+
+    <p class="cl-signoff">
+      <span class="cl-closing">Sincerely,</span>
+      <span class="cl-name">{{ profile.full_name }}</span>
+    </p>
+  </div>
+</body>
+</html>

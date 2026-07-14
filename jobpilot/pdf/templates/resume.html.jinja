@@ -55,7 +55,10 @@
   {% for ed in education %}
   <div class="entry">
     <div class="entry-header"><span>{{ ed.degree }}{% if ed.field %}, {{ ed.field }}{% endif %}</span><span>{{ ed.start_date }} - {{ ed.end_date }}</span></div>
-    <div class="entry-sub"><span>{{ ed.school }}</span></div>
+    <div class="entry-sub"><span>{{ ed.school }}</span>{% if ed.cgpa %}<span>CGPA: {{ ed.cgpa }}</span>{% endif %}</div>
+    {% if ed.coursework %}
+    <p class="skills-list"><span class="skills-category">Relevant coursework:</span> {{ ed.coursework|join(', ') }}</p>
+    {% endif %}
   </div>
   {% endfor %}
   {% endif %}

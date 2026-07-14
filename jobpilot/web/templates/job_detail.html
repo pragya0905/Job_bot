@@ -1,44 +1,81 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}{{ job.title }} · JobPilot{% endblock %}
 {% block content %}
 <div class="mb-4">
-  <a href="/jobs" class="text-sm text-blue-600 hover:underline">← All jobs</a>
+  <a href="/jobs" class="btn btn-ghost text-sm">← All jobs</a>
 </div>
 
-<div class="flex items-start justify-between mb-6">
+<div class="flex items-start justify-between mb-6 gap-4">
   <div>
-    <h1 class="text-2xl font-semibold">{{ job.title }}</h1>
-    <p class="text-slate-600">{{ job.company_name }} · {{ job.location_raw }}</p>
-    {% if job.url %}<a href="{{ job.url }}" target="_blank" class="text-sm text-blue-600 hover:underline">Original posting →</a>{% endif %}
+    <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
+      {{ job.title }}
+      {% if is_stale %}<span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600 align-middle" title="Not seen in a scan since {{ job.last_seen_at.strftime('%Y-%m-%d') }}">🕸 stale</span>{% endif %}
+    </h1>
+    <p class="text-slate-600 mt-0.5">
+      {{ job.company_name }} · {{ job.location_raw }}
+      {% if job.display_salary_is_estimate %}
+      · <span class="font-medium text-amber-700">~{{ job.display_salary }}</span>
+      <span class="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded" title="Not stated by the employer — a rough band from a static public-data reference table, classified by role/level/location. See the job's own posting for the real figure, if any.">estimated, unverified</span>
+      {% elif job.display_salary %}
+      · <span class="font-medium text-emerald-700">{{ job.display_salary }}</span> <span class="text-xs text-slate-400">(stated in posting)</span>
+      {% endif %}
+    </p>
+    {% if job.url %}<a href="{{ job.url }}" target="_blank" class="btn btn-ghost text-sm mt-1 inline-flex">Original posting →</a>{% endif %}
+    {% if is_stale %}<p class="text-xs text-slate-400 mt-1">Last seen in a scan on {{ job.last_seen_at.strftime('%Y-%m-%d') }} — it may have been filled or taken down since. It'll un-flag automatically if a future scan sees it again.</p>{% endif %}
   </div>
-  <div class="text-right">
+  <div class="text-right shrink-0">
     {% if score %}
-    <div class="text-3xl font-bold {{ 'text-emerald-600' if score.score >= 75 else 'text-slate-700' }}">{{ score.score }}</div>
-    <div class="text-xs text-slate-500">fit score</div>
+    <div class="inline-flex flex-col items-center justify-center w-20 h-20 rounded-full mb-2
+      {{ 'bg-emerald-100' if score.score >= 75 else 'bg-amber-100' if score.score >= 50 else 'bg-slate-100' }}">
+      <div class="text-3xl font-extrabold {{ 'text-emerald-700' if score.score >= 75 else 'text-amber-700' if score.score >= 50 else 'text-slate-500' }}">{{ score.score }}</div>
+    </div>
+    <div class="text-xs text-slate-400 mb-2">fit score</div>
     {% endif %}
-    <form method="post" action="/jobs/{{ job.id }}/apply" class="mt-2">
-      <button class="text-sm px-3 py-1.5 rounded font-medium {{ 'bg-emerald-600 text-white' if not application or application.status != 'applied' else 'bg-slate-200 text-slate-600' }}">
+    <form method="post" action="/jobs/{{ job.id }}/apply">
+      <button class="btn {{ 'btn-secondary' if application and application.status == 'applied' else 'btn-primary' }} text-sm px-3.5 py-1.5">
         {{ "✓ Applied" if application and application.status == "applied" else "Mark Applied" }}
       </button>
     </form>
   </div>
 </div>
 
+{% if not score %}
+<div class="card p-5 mb-6 flex items-center justify-between gap-4">
+  <div>
+    <h2 class="font-semibold mb-1 flex items-center gap-2">
+      <span aria-hidden="true">{{ "⚠️" if job.status == "needs_review" else "⏳" }}</span>
+      {{ "Scoring failed" if job.status == "needs_review" else "Not scored yet" }}
+    </h2>
+    <p class="text-sm text-slate-500">
+      {% if job.status == "needs_review" %}The local model failed to return a valid score for this job (this is usually transient — a retry normally succeeds). It'll also be retried automatically on the next scan.
+      {% else %}This job hasn't been scored yet — it'll be picked up on the next scan, or you can score it right now.{% endif %}
+    </p>
+  </div>
+  <form method="post" action="/jobs/{{ job.id }}/retry_score" class="shrink-0">
+    <button class="btn btn-primary text-sm px-4 py-2">↻ {{ "Retry scoring" if job.status == "needs_review" else "Score now" }}</button>
+  </form>
+</div>
+{% endif %}
+
 {% if score %}
-<div class="bg-white rounded-lg shadow p-5 mb-6">
-  <h2 class="font-semibold mb-2">Why this score</h2>
-  <p class="text-sm text-slate-700 mb-3">{{ score.rationale }}</p>
-  <div class="grid grid-cols-2 gap-4 text-sm">
+<div class="card p-5 mb-6">
+  <h2 class="font-semibold mb-2 flex items-center gap-2"><span aria-hidden="true">💡</span> Why this score</h2>
+  <p class="text-sm text-slate-700 {{ 'mb-2' if score.semantic_score is not none else 'mb-4' }} leading-relaxed">{{ score.rationale }}</p>
+  {% if score.semantic_score is not none %}
+  <p class="text-xs text-slate-400 mb-4">🧬 Semantic similarity: <span class="font-medium text-slate-600">{{ score.semantic_score }}%</span> <span class="text-slate-400">— embedding-based, extra signal only</span></p>
+  {% endif %}
+  <div class="grid grid-cols-2 gap-6 text-sm">
     <div>
-      <div class="text-slate-500 mb-1">Matched skills</div>
-      <div class="flex flex-wrap gap-1">
-        {% for s in score.matched_skills %}<span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-xs">{{ s }}</span>{% endfor %}
+      <div class="text-slate-500 mb-1.5 font-medium">Matched skills</div>
+      <div class="flex flex-wrap gap-1.5">
+        {% for s in score.matched_skills %}<span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-xs font-medium">{{ s }}</span>{% endfor %}
       </div>
     </div>
     <div>
-      <div class="text-slate-500 mb-1">Missing / gaps</div>
-      <div class="flex flex-wrap gap-1">
-        {% for s in score.missing_requirements %}<span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-xs">{{ s }}</span>{% endfor %}
+      <div class="text-slate-500 mb-1.5 font-medium">Missing / gaps</div>
+      <div class="flex flex-wrap gap-1.5">
+        {% for s in score.missing_requirements %}<span class="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">{{ s }}</span>{% endfor %}
       </div>
     </div>
   </div>
@@ -46,80 +83,54 @@
 {% endif %}
 
 <div class="grid grid-cols-2 gap-6">
-  <div class="bg-white rounded-lg shadow p-5">
-    <h2 class="font-semibold mb-3">Job description</h2>
-    <pre class="whitespace-pre-wrap text-sm text-slate-700 max-h-[70vh] overflow-y-auto">{{ job.description_text }}</pre>
+  <div class="card p-5">
+    <h2 class="font-semibold mb-3 flex items-center gap-2"><span aria-hidden="true">📋</span> Job description</h2>
+    <pre class="whitespace-pre-wrap text-sm text-slate-700 max-h-[70vh] overflow-y-auto leading-relaxed">{{ job.description_text }}</pre>
   </div>
 
-  <div class="bg-white rounded-lg shadow p-5">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold">Tailored draft {% if draft %}(v{{ draft.version }}{% if draft.edited_manually %}, edited{% endif %}){% endif %}</h2>
-      <div class="space-x-2">
-        <form method="post" action="/jobs/{{ job.id }}/regenerate" class="inline">
-          <button class="text-xs bg-slate-800 text-white px-3 py-1.5 rounded">Regenerate with AI</button>
-        </form>
-        {% if draft %}
-        <a href="/jobs/{{ job.id }}/pdf?view=1" target="_blank" class="text-xs bg-slate-200 text-slate-700 px-3 py-1.5 rounded inline-block">View Resume</a>
-        <a href="/jobs/{{ job.id }}/pdf" class="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded inline-block">Download PDF</a>
-        {% endif %}
-      </div>
-    </div>
-
-    {% if draft %}
-    <form method="post" action="/jobs/{{ job.id }}/draft" class="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-      <label class="block">
-        <span class="text-xs text-slate-500">Summary</span>
-        <textarea name="summary" rows="3" class="mt-1 w-full border rounded px-3 py-2 text-sm">{{ draft.summary }}</textarea>
-      </label>
-      <div>
-        <span class="text-xs text-slate-500">Skills emphasis (by category)</span>
-        {% for cat in draft.skills_emphasis %}
-        <div class="grid grid-cols-3 gap-2 mt-1">
-          <input name="skillcat_category" value="{{ cat.category }}" class="border rounded px-2 py-1 text-sm" />
-          <input name="skillcat_items" value="{{ cat.skills|join(', ') }}" class="col-span-2 border rounded px-2 py-1 text-sm" />
-        </div>
-        {% endfor %}
-      </div>
-      {% if draft.experience %}
-      <div>
-        <span class="text-xs text-slate-500 font-semibold">Experience</span>
-        {% for exp in draft.experience %}
-        <div class="border rounded p-3 space-y-2 mt-1">
-          <div class="grid grid-cols-2 gap-2">
-            <input name="exp_company" value="{{ exp.company }}" class="border rounded px-2 py-1 text-sm" />
-            <input name="exp_title" value="{{ exp.title }}" class="border rounded px-2 py-1 text-sm" />
-            <input name="exp_location" value="{{ exp.location }}" class="border rounded px-2 py-1 text-sm" />
-            <input name="exp_dates" value="{{ exp.dates }}" class="border rounded px-2 py-1 text-sm" />
-          </div>
-          <textarea name="exp_bullets" rows="4" class="w-full border rounded px-2 py-1 text-sm">{{ exp.bullets|join('\n') }}</textarea>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-      {% if draft.internships %}
-      <div>
-        <span class="text-xs text-slate-500 font-semibold">Internships</span>
-        {% for intern in draft.internships %}
-        <div class="border rounded p-3 space-y-2 mt-1">
-          <div class="grid grid-cols-2 gap-2">
-            <input name="intern_company" value="{{ intern.company }}" class="border rounded px-2 py-1 text-sm" />
-            <input name="intern_title" value="{{ intern.title }}" class="border rounded px-2 py-1 text-sm" />
-            <input name="intern_location" value="{{ intern.location }}" class="border rounded px-2 py-1 text-sm" />
-            <input name="intern_dates" value="{{ intern.dates }}" class="border rounded px-2 py-1 text-sm" />
-          </div>
-          <textarea name="intern_bullets" rows="3" class="w-full border rounded px-2 py-1 text-sm">{{ intern.bullets|join('\n') }}</textarea>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-      <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded text-sm font-medium">Save edits</button>
-    </form>
-    {% else %}
-    <p class="text-slate-500 text-sm">No tailored draft yet.
-      {% if score and score.score >= 75 %}This should be generated automatically on the next scan, or click "Regenerate with AI" above.
-      {% else %}This job scored below the auto-tailoring threshold — click "Regenerate with AI" to draft one anyway.{% endif %}
-    </p>
-    {% endif %}
+  <div hx-get="/jobs/{{ job.id }}/draft_status" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card p-5 text-sm text-slate-400">Loading…</div>
   </div>
+</div>
+
+<div class="card p-5 mt-6">
+  <h2 class="font-semibold mb-3 flex items-center gap-2"><span aria-hidden="true">🗒️</span> Notes &amp; timeline</h2>
+  <form method="post" action="/jobs/{{ job.id }}/notes" class="flex gap-2 mb-4">
+    <input name="note" placeholder="e.g. Recruiter call scheduled for Friday" class="input flex-1 px-3 py-2 text-sm" required />
+    <button type="submit" class="btn btn-secondary text-sm px-4 py-2 shrink-0">Add note</button>
+  </form>
+  {% if events %}
+  <ul class="space-y-2.5">
+    {% for event in events %}
+    <li class="flex items-start gap-3 text-sm">
+      <span class="text-xs text-slate-400 whitespace-nowrap pt-0.5 w-36 shrink-0">{{ event.created_at.strftime("%Y-%m-%d %H:%M") }}</span>
+      {% if event.kind == "status_change" %}
+      <span class="text-slate-400 italic">{{ event.text }}</span>
+      {% else %}
+      <span class="text-slate-700">{{ event.text }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-slate-400">No notes or status changes yet.</p>
+  {% endif %}
+</div>
+
+<div class="card p-5 mt-6">
+  <h2 class="font-semibold mb-3 flex items-center gap-2"><span aria-hidden="true">📜</span> Scan activity</h2>
+  {% if scan_log_entries %}
+  <ul class="space-y-1.5 font-mono text-xs">
+    {% for entry in scan_log_entries %}
+    <li class="flex items-start gap-3 {{ 'text-red-600' if '✗' in entry.message else 'text-amber-700' if '⚠' in entry.message else 'text-emerald-700' if '→' in entry.message else 'text-sky-700' if '↳' in entry.message else 'text-slate-600' }}">
+      <span class="text-slate-400 whitespace-nowrap shrink-0">{{ entry.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+      <span class="flex-1">{{ entry.message }}</span>
+      <a href="/scan/{{ entry.scan_run_id }}" class="text-slate-400 hover:text-slate-600 shrink-0 whitespace-nowrap">scan #{{ entry.scan_run_id }} →</a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-slate-400">No scoring or tailoring activity recorded for this job yet.</p>
+  {% endif %}
 </div>
 {% endblock %}

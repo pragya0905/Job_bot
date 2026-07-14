@@ -81,3 +81,17 @@ async def structured_chat(
             logger.warning("LLM call failed (attempt %s/%s, model=%s): %s", attempt, max_attempts, model, exc)
 
     return None
+
+
+async def unload_model(host: str, model: str) -> None:
+    """Ask Ollama to evict a model from memory immediately (keep_alive=0)
+    rather than waiting out its normal idle timeout. Used when a scan is
+    cancelled so a stopped scan actually frees RAM/VRAM right away instead
+    of leaving a multi-GB model warm for no reason. Best-effort — a failure
+    here shouldn't surface as a scan error.
+    """
+    client = ollama.AsyncClient(host=host)
+    try:
+        await client.generate(model=model, prompt="", keep_alive=0)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("failed to unload model %s: %s", model, exc)

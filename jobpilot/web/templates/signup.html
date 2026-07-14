@@ -1,28 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Sign up · JobPilot{% endblock %}
 {% block content %}
-<div class="max-w-sm mx-auto mt-12">
-  <h1 class="text-2xl font-semibold mb-6 text-center">Create your JobPilot account</h1>
-  <div class="bg-white rounded-lg shadow p-6">
+<div class="max-w-sm mx-auto mt-16">
+  <div class="text-center mb-6">
+    <div class="text-4xl mb-2" aria-hidden="true">✈️</div>
+    <h1 class="text-2xl font-bold tracking-tight">Create your account</h1>
+    <p class="text-sm text-slate-500 mt-1">Your data stays local — nothing leaves this machine.</p>
+  </div>
+  <div class="card p-6">
     {% if error %}
-    <p class="text-sm text-red-600 mb-4">{{ error }}</p>
+    <div class="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2.5 rounded-lg mb-4">{{ error }}</div>
     {% endif %}
     <form method="post" action="/signup" class="space-y-4">
       <label class="block">
-        <span class="text-sm text-slate-600">Email</span>
-        <input type="email" name="email" required class="mt-1 w-full border rounded px-3 py-2" />
+        <span class="text-sm font-medium text-slate-700">Email</span>
+        <input type="email" name="email" required autofocus class="input mt-1 w-full px-3 py-2.5" />
       </label>
       <label class="block">
-        <span class="text-sm text-slate-600">Password (min 8 characters)</span>
-        <input type="password" name="password" required minlength="8" class="mt-1 w-full border rounded px-3 py-2" />
+        <span class="text-sm font-medium text-slate-700">Password</span>
+        <input type="password" name="password" required minlength="8" class="input mt-1 w-full px-3 py-2.5" />
+        <span class="text-xs text-slate-400">Min 8 characters</span>
       </label>
       <label class="block">
-        <span class="text-sm text-slate-600">Confirm password</span>
-        <input type="password" name="confirm_password" required minlength="8" class="mt-1 w-full border rounded px-3 py-2" />
+        <span class="text-sm font-medium text-slate-700">Confirm password</span>
+        <input type="password" name="confirm_password" required minlength="8" class="input mt-1 w-full px-3 py-2.5" />
       </label>
-      <button type="submit" class="w-full bg-emerald-600 text-white px-4 py-2.5 rounded font-medium">Sign up</button>
+      <button type="submit" class="btn btn-primary w-full justify-center px-4 py-2.5">Sign up</button>
     </form>
-    <p class="text-sm text-slate-500 mt-4 text-center">Already have an account? <a href="/login" class="text-blue-600 hover:underline">Log in</a></p>
   </div>
+  <p class="text-sm text-slate-500 mt-5 text-center">Already have an account? <a href="/login" class="text-emerald-700 font-medium hover:underline">Log in</a></p>
 </div>
 {% endblock %}

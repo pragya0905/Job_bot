@@ -1,5 +1,6 @@
 import os
 import platform
+from datetime import date
 from pathlib import Path
 
 if platform.system() == "Darwin":
@@ -11,6 +12,8 @@ if platform.system() == "Darwin":
 
 from jinja2 import Environment, FileSystemLoader  # noqa: E402
 from weasyprint import HTML  # noqa: E402
+
+from jobpilot.date_utils import resume_entry_sort_key  # noqa: E402
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 _env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
@@ -57,10 +60,14 @@ def render_resume_pdf(
 ) -> Path:
     # Internships render under the same "Experience" heading as regular
     # roles (tagged so the reader can still tell them apart) rather than a
-    # separate section — reads as one continuous work history.
+    # separate section — reads as one continuous work history, so both lists
+    # need to be merged into a single reverse-chronological order rather than
+    # just concatenated (which would put every internship after every role
+    # regardless of actual dates).
     combined_experience = [{**e, "is_internship": False} for e in experience] + [
         {**e, "is_internship": True} for e in internships
     ]
+    combined_experience.sort(key=resume_entry_sort_key, reverse=True)
 
     css = (TEMPLATE_DIR / "resume.css").read_text()
     template = _env.get_template("resume.html.jinja")
@@ -73,6 +80,29 @@ def render_resume_pdf(
         projects=projects,
         education=education,
         certifications=certifications,
+        css=css,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    HTML(string=html_str).write_pdf(str(output_path))
+    return output_path
+
+
+def render_cover_letter_pdf(*, profile, company_name: str, cover_letter: str, output_path: Path) -> Path:
+    paragraphs = [p.strip() for p in cover_letter.replace("\r\n", "\n").split("\n\n") if p.strip()]
+    if not paragraphs and cover_letter.strip():
+        # Model/user occasionally uses single newlines rather than blank-line
+        # paragraph breaks — fall back to that rather than emitting one wall
+        # of text with no breaks at all.
+        paragraphs = [p.strip() for p in cover_letter.split("\n") if p.strip()]
+
+    css = (TEMPLATE_DIR / "resume.css").read_text()
+    template = _env.get_template("cover_letter.html.jinja")
+    html_str = template.render(
+        profile=profile,
+        contact_items=_build_contact_items(profile),
+        company_name=company_name,
+        paragraphs=paragraphs,
+        today=date.today().strftime("%B %-d, %Y"),
         css=css,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)

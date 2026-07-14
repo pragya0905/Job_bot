@@ -1,15 +1,15 @@
 <div class="space-y-6">
   <div class="grid grid-cols-2 gap-4">
-    <div class="bg-white rounded-lg shadow p-5">
+    <div class="card p-5">
       <div class="text-sm text-slate-500 mb-1">CPU ({{ system.cpu_count }} cores)</div>
-      <div class="text-3xl font-bold {{ 'text-red-600' if system.cpu_percent >= 85 else 'text-amber-600' if system.cpu_percent >= 50 else 'text-emerald-600' }}">{{ system.cpu_percent }}%</div>
+      <div class="text-3xl font-extrabold {{ 'text-red-600' if system.cpu_percent >= 85 else 'text-amber-600' if system.cpu_percent >= 50 else 'text-emerald-600' }}">{{ system.cpu_percent }}%</div>
       <div class="w-full bg-slate-100 rounded-full h-2 mt-2">
         <div class="h-2 rounded-full {{ 'bg-red-500' if system.cpu_percent >= 85 else 'bg-amber-500' if system.cpu_percent >= 50 else 'bg-emerald-500' }}" style="width: {{ system.cpu_percent }}%"></div>
       </div>
     </div>
-    <div class="bg-white rounded-lg shadow p-5">
+    <div class="card p-5">
       <div class="text-sm text-slate-500 mb-1">Memory</div>
-      <div class="text-3xl font-bold {{ 'text-red-600' if system.memory_percent >= 85 else 'text-amber-600' if system.memory_percent >= 50 else 'text-emerald-600' }}">{{ system.memory_percent }}%</div>
+      <div class="text-3xl font-extrabold {{ 'text-red-600' if system.memory_percent >= 85 else 'text-amber-600' if system.memory_percent >= 50 else 'text-emerald-600' }}">{{ system.memory_percent }}%</div>
       <div class="text-xs text-slate-500 mt-1">{{ system.memory_used_gb }} GB / {{ system.memory_total_gb }} GB</div>
       <div class="w-full bg-slate-100 rounded-full h-2 mt-2">
         <div class="h-2 rounded-full {{ 'bg-red-500' if system.memory_percent >= 85 else 'bg-amber-500' if system.memory_percent >= 50 else 'bg-emerald-500' }}" style="width: {{ system.memory_percent }}%"></div>
@@ -17,17 +17,17 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-lg shadow p-5">
-    <h2 class="font-semibold mb-3">Ollama models</h2>
+  <div class="card p-5">
+    <h2 class="font-semibold mb-3 flex items-center gap-2"><span aria-hidden="true">🤖</span> Ollama models</h2>
     {% if ollama_models %}
     <table class="w-full text-sm">
-      <thead class="text-left text-slate-500 border-b">
-        <tr><th class="py-2">Model</th><th>Size on disk</th><th>VRAM/RAM in use</th><th>Context window</th></tr>
+      <thead class="text-left text-slate-500 border-b border-slate-200">
+        <tr><th class="py-2 font-medium">Model</th><th class="font-medium">Size on disk</th><th class="font-medium">VRAM/RAM in use</th><th class="font-medium">Context window</th></tr>
       </thead>
       <tbody>
         {% for m in ollama_models %}
-        <tr class="border-b last:border-0">
-          <td class="py-2 font-medium">{{ m.name }}</td>
+        <tr class="border-b border-slate-100 last:border-0">
+          <td class="py-2.5 font-medium">{{ m.name }}</td>
           <td>{{ m.size_gb }} GB</td>
           <td>{{ m.vram_gb }} GB</td>
           <td>{{ m.context_length }}</td>

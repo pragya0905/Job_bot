@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Scan #{{ run.id }} · JobPilot{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Scan #{{ run.id }}</h1>
-<div hx-get="/scan/{{ run.id }}/status" hx-trigger="load" hx-swap="outerHTML" id="scan-status">
-  Loading…
+<div class="mb-4">
+  <a href="/scan" class="btn btn-ghost text-sm">← Run Scan</a>
+</div>
+<h1 class="text-2xl font-bold tracking-tight mb-4">Scan #{{ run.id }}</h1>
+<div hx-get="/scan/{{ run.id }}/status{% if q %}?q={{ q }}{% endif %}" hx-trigger="load" hx-swap="outerHTML" id="scan-status">
+  <div class="card p-5 text-sm text-slate-400">Loading…</div>
 </div>
 {% endblock %}

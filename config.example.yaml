@@ -2,6 +2,7 @@
 
 database_path: "data/jobpilot.db"
 resume_dir: "data/resumes"
+stale_after_days: 14   # days since last-seen before a job is flagged stale in the Jobs list
 
 # Company watchlists (which companies' Greenhouse/Lever/Ashby boards to poll)
 # are managed per-user in the app itself at /companies, not here.
@@ -58,3 +59,6 @@ tailoring:
 
 ollama:
   host: "http://localhost:11434"
+
+embedding:
+  model: "nomic-embed-text"   # only used if a user opts into semantic scoring on /preferences

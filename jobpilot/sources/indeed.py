@@ -21,6 +21,14 @@ MAX_LOCATIONS_PER_RUN = 3
 MIN_DELAY_SECONDS = 3
 MAX_DELAY_SECONDS = 8
 
+# Only "hyderabad"/"india" were recognized before — every other Indian city
+# a user could pick on /preferences (Bangalore, Pune, ...) silently fell
+# through to the US site instead, which wouldn't have relevant results.
+INDIAN_LOCATION_HINTS = (
+    "india", "hyderabad", "bangalore", "bengaluru", "mumbai", "pune",
+    "delhi", "ncr", "gurgaon", "gurugram", "noida", "chennai", "kolkata",
+)
+
 
 def fetch_indeed_jobs(title_keywords: list[str], locations: list[str]) -> list[RawJob]:
     if not locations:
@@ -38,7 +46,7 @@ def fetch_indeed_jobs(title_keywords: list[str], locations: list[str]) -> list[R
 
 
 def _fetch_one_location(query: str, location: str) -> list[RawJob]:
-    domain = "in.indeed.com" if "hyderabad" in location.lower() or "india" in location.lower() else "www.indeed.com"
+    domain = "in.indeed.com" if any(hint in location.lower() for hint in INDIAN_LOCATION_HINTS) else "www.indeed.com"
     params = {"q": query, "l": location}
     url = f"https://{domain}/jobs?{urlencode(params)}"
 

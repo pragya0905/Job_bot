@@ -14,3 +14,4 @@ class JobScore(SQLModel, table=True):
     matched_skills: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     missing_requirements: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     scored_at: datetime = Field(default_factory=datetime.utcnow)
+    semantic_score: Optional[int] = None  # 0-100, embedding cosine similarity — extra signal, not blended into `score`

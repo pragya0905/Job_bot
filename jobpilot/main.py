@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from jobpilot.auth import NotAuthenticatedError, get_or_create_session_secret
 from jobpilot.db import init_db
-from jobpilot.web.routes import auth, companies, dashboard, jobs, monitor, preferences, profile, scan
+from jobpilot.web.routes import auth, companies, dashboard, export, jobs, monitor, preferences, profile, scan
 
 
 @asynccontextmanager
@@ -47,3 +47,4 @@ app.include_router(preferences.router)
 app.include_router(jobs.router)
 app.include_router(scan.router)
 app.include_router(monitor.router)
+app.include_router(export.router)

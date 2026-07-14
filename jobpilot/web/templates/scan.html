@@ -1,44 +1,64 @@
 {% extends "base.html" %}
 {% block title %}Run Scan · JobPilot{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Run Scan</h1>
+<h1 class="text-2xl font-bold tracking-tight mb-1">Run Scan</h1>
 <p class="text-sm text-slate-500 mb-6">Manually triggered — collects new postings from your company watchlist and job boards, filters them, scores fit with a local model, and drafts tailored resumes for the strong matches.</p>
 
-<form method="post" action="/scan/run" class="mb-8 space-y-3">
+<form method="post" action="/scan/run" class="card p-5 mb-8 space-y-4">
   <div class="flex items-center gap-6 text-sm text-slate-600">
     <label class="flex items-center gap-2">
-      <input type="checkbox" name="include_linkedin" {{ "checked" if config.sources.linkedin.enabled }} />
-      Include LinkedIn (fragile, best-effort)
+      <input type="checkbox" name="include_linkedin" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" {{ "checked" if config.sources.linkedin.enabled }} />
+      Include LinkedIn <span class="text-xs text-slate-400">(fragile, best-effort)</span>
     </label>
     <label class="flex items-center gap-2">
-      <input type="checkbox" name="include_indeed" {{ "checked" if config.sources.indeed.enabled }} />
-      Include Indeed (fragile, best-effort)
+      <input type="checkbox" name="include_indeed" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" {{ "checked" if config.sources.indeed.enabled }} />
+      Include Indeed <span class="text-xs text-slate-400">(fragile, best-effort)</span>
     </label>
   </div>
-  <button type="submit" class="bg-emerald-600 text-white px-5 py-2.5 rounded font-medium">Run Scan Now</button>
+  <button type="submit" class="btn btn-primary px-5 py-2.5">▶ Run Scan Now</button>
 </form>
 
-<section class="bg-white rounded-lg shadow p-5">
-  <h2 class="font-semibold text-lg mb-4">Recent runs</h2>
+<form id="bulk-delete-runs-form" method="post" action="/scan/delete" onsubmit="return confirm('Delete the selected scan runs? This only removes the run records, not the jobs they found.');"></form>
+
+<section class="card p-5">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-semibold text-lg flex items-center gap-2"><span aria-hidden="true">🕓</span> Recent runs</h2>
+    {% if runs %}
+    <button type="submit" form="bulk-delete-runs-form" class="btn btn-danger text-xs px-3 py-1.5">🗑 Delete selected</button>
+    {% endif %}
+  </div>
   {% if runs %}
   <table class="w-full text-sm">
-    <thead class="text-left text-slate-500 border-b">
-      <tr><th class="py-2">Started</th><th>Status</th><th>Collected</th><th>Filtered</th><th>Scored</th><th>Tailored</th><th></th></tr>
+    <thead class="text-left text-slate-500 border-b border-slate-200">
+      <tr>
+        <th class="py-2 px-2 whitespace-nowrap"><input type="checkbox" class="rounded border-slate-300" onclick="document.querySelectorAll('.run-checkbox').forEach(cb => cb.checked = this.checked)" /></th>
+        <th class="px-2 font-medium">Started</th><th class="font-medium">Status</th><th class="font-medium">Collected</th><th class="font-medium">Filtered</th><th class="font-medium">Scored</th><th class="font-medium">Tailored</th><th></th>
+      </tr>
     </thead>
     <tbody>
       {% for run in runs %}
-      <tr class="border-b last:border-0">
-        <td class="py-2">{{ run.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
-        <td>{{ run.status }}</td>
+      <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+        <td class="py-2.5 px-2 whitespace-nowrap">
+          {% if run.status != "running" %}
+          <input type="checkbox" class="run-checkbox rounded border-slate-300" form="bulk-delete-runs-form" name="run_ids" value="{{ run.id }}" />
+          {% endif %}
+        </td>
+        <td class="px-2">{{ run.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>
+          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium
+            {{ 'bg-amber-100 text-amber-700' if run.status == 'running' else 'bg-emerald-100 text-emerald-700' if run.status == 'completed' else 'bg-slate-200 text-slate-600' if run.status == 'cancelled' else 'bg-red-100 text-red-700' }}">
+            {{ run.status }}
+          </span>
+        </td>
         <td>{{ run.jobs_collected }}</td>
         <td>{{ run.jobs_filtered }}</td>
         <td>{{ run.jobs_scored }}</td>
         <td>{{ run.jobs_tailored }}</td>
-        <td class="space-x-2">
-          <a href="/scan/{{ run.id }}" class="text-blue-600 hover:underline">view</a>
+        <td class="space-x-3 text-right">
+          <a href="/scan/{{ run.id }}" class="btn btn-ghost text-sm">view →</a>
           {% if run.status != "running" %}
           <form method="post" action="/scan/{{ run.id }}/delete" class="inline" onsubmit="return confirm('Delete this scan run? This only removes the run record, not the jobs it found.');">
-            <button class="text-red-600 hover:underline">delete</button>
+            <button class="text-red-600 hover:underline text-sm">delete</button>
           </form>
           {% endif %}
         </td>
@@ -47,7 +67,42 @@
     </tbody>
   </table>
   {% else %}
-  <p class="text-slate-500 text-sm">No scans yet.</p>
+  <div class="text-center py-10">
+    <div class="text-4xl mb-3" aria-hidden="true">📡</div>
+    <p class="text-slate-500 text-sm">No scans yet — run one above to start collecting jobs.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card p-5 mt-6">
+  <h2 class="font-semibold text-lg mb-4 flex items-center gap-2"><span aria-hidden="true">📡</span> Collector health</h2>
+  {% if source_health %}
+  <table class="w-full text-sm">
+    <thead class="text-left text-slate-500 border-b border-slate-200">
+      <tr><th class="py-2 font-medium">Source</th><th class="font-medium">Status</th><th class="font-medium">Last success</th><th class="font-medium">Last jobs found</th><th class="font-medium">Last attempt</th></tr>
+    </thead>
+    <tbody>
+      {% for h in source_health %}
+      <tr class="border-b border-slate-100 last:border-0">
+        <td class="py-2.5 font-medium">{{ h.display_name }}</td>
+        <td>
+          {% if h.consecutive_failures == 0 %}
+          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">✓ healthy</span>
+          {% elif h.last_success_at %}
+          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700" title="{{ h.last_error }}">⚠ degraded ({{ h.consecutive_failures }} failure{{ 's' if h.consecutive_failures != 1 }} in a row)</span>
+          {% else %}
+          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700" title="{{ h.last_error }}">✗ failing</span>
+          {% endif %}
+        </td>
+        <td class="text-slate-500">{{ h.last_success_at.strftime("%Y-%m-%d %H:%M") if h.last_success_at else "never" }}</td>
+        <td class="text-slate-500">{{ h.last_job_count }}</td>
+        <td class="text-slate-400 text-xs">{{ h.last_attempt_at.strftime("%Y-%m-%d %H:%M") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-slate-500 text-sm">No collector data yet — run a scan to see per-source health here.</p>
   {% endif %}
 </section>
 {% endblock %}

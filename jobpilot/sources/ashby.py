@@ -19,6 +19,12 @@ def fetch_ashby_jobs(company_name: str, client_name: str) -> list[RawJob]:
         location = item.get("location", "")
         is_remote = bool(item.get("isRemote")) or looks_remote(location)
         description = item.get("descriptionPlain") or html_to_text(item.get("descriptionHtml", ""))
+        # Ashby returns a pre-formatted human-readable range (e.g. "$151K –
+        # $231K • Offers Equity") when the company has pay transparency
+        # turned on — None otherwise. Using it directly avoids re-deriving a
+        # summary from the underlying compensationTiers/components structure.
+        compensation = item.get("compensation") or {}
+        salary_raw = compensation.get("compensationTierSummary") or ""
         jobs.append(
             RawJob(
                 source="ashby",
@@ -29,6 +35,7 @@ def fetch_ashby_jobs(company_name: str, client_name: str) -> list[RawJob]:
                 is_remote=is_remote,
                 url=item.get("jobUrl") or item.get("applyUrl", ""),
                 description_text=description,
+                salary_raw=salary_raw,
             )
         )
     return jobs

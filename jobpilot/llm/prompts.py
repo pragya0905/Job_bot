@@ -11,14 +11,27 @@ from jobpilot.models import (
 
 SCORING_SYSTEM = """You are an expert technical recruiter evaluating fit between a candidate \
 and a job description for the candidate's own benefit — help them decide if this job is worth \
-their time, not just whether keywords overlap. Weigh actual experience depth, seniority match, \
-and domain relevance. If the role says "remote" but is scoped to a specific country/region the \
-candidate isn't in, factor that into the score and say so in the rationale. If the candidate has \
-stated sector preferences below, treat them as a soft signal, not a hard requirement: nudge the \
-score up a little for a good sector match and down a little for a sector they want to avoid, but \
-a strong role/skills fit should still outscore a weak one even in a preferred sector. Mention the \
-sector fit in the rationale only when it materially affected the score. Score 0-100. Keep the \
-rationale to 2-3 concise sentences, not an essay."""
+their time, not just whether keywords overlap. \
+\
+First, "stated_salary" (always fill this in, it comes before everything else): if the job \
+description literally states an actual PAY figure — a base salary, total compensation, or salary \
+range, explicitly framed as pay/salary/compensation/CTC (e.g. "$140k-$180k", "₹18-25 LPA", \
+"CTC 20 LPA", "$85/hr") — copy it close to verbatim; do not reformat it, do not convert \
+currencies, do not do any math on it. Do NOT extract benefits like 401(k)/403(b) retirement plan \
+matching, health insurance, PTO, or stock/equity mentioned with no number attached — none of \
+those are a salary figure, even though they contain digits or look similar. Also do not extract \
+unrelated numbers like years-of-experience or team size. If the description does not state an \
+actual pay figure anywhere, you MUST set stated_salary to exactly the string "none" — never \
+invent a number, and never extract a non-salary number just because it superficially resembles one. \
+\
+Then weigh actual experience depth, seniority match, and domain relevance. If the role says \
+"remote" but is scoped to a specific country/region the candidate isn't in, factor that into the \
+score and say so in the rationale. If the candidate has stated sector preferences below, treat \
+them as a soft signal, not a hard requirement: nudge the score up a little for a good sector match \
+and down a little for a sector they want to avoid, but a strong role/skills fit should still \
+outscore a weak one even in a preferred sector. Mention the sector fit in the rationale only when \
+it materially affected the score. Score 0-100. Keep the rationale to 2-3 concise sentences, not \
+an essay."""
 
 TAILORING_SYSTEM = """You are an expert resume writer helping a candidate tailor their resume to a \
 specific job description. You may ONLY reorder and re-emphasize content that already exists in the \
@@ -43,7 +56,37 @@ into "experience" and never duplicate the same entry into both lists. For skills
 names EXACTLY as they appear in the profile's skill list — never invent a new category name or \
 description, never add commentary into a category name. Within each category you may select and \
 reorder skills to foreground what's most relevant to this job, but every skill you output under a \
-category must already be listed under that exact category in the profile."""
+category must already be listed under that exact category in the profile. \
+\
+Also write a "cover_letter": 3-4 short paragraphs of BODY TEXT ONLY, in the candidate's voice, \
+explaining why they're a strong fit for this specific role at this specific company. The rendered \
+letter already has its own greeting line ("Dear {Company} Hiring Team,") and its own closing/ \
+signature block added automatically — your "cover_letter" text must NOT include either of those: \
+no "Dear ..." greeting of any kind, no "Sincerely" / "Best regards" / "Best," / "Yours truly" or any \
+other closing line, and no signature name at the end. Start directly with the first body sentence \
+and end directly after the last body sentence — nothing before or after the paragraphs themselves. \
+The same anti-fabrication rule applies here even though it's prose, not bullets: only reference \
+employers, titles, skills, and accomplishments that are literally present in the candidate profile \
+below — never invent a metric, employer, or skill that isn't there. Reference the job title and \
+company by name. Keep the tone professional and direct, not flowery."""
+
+BULLET_GENERATION_SYSTEM = """You write resume bullet points from a candidate's raw description of \
+what they did in a role — the raw description is the ONLY source of truth. \
+\
+Rules (violating any of these makes the bullets unusable and they will be discarded): \
+1. Write EXACTLY the requested number of bullets, no more, no fewer. \
+2. You may ONLY use facts, technologies, numbers, and percentages that are EXPLICITLY stated in the \
+raw description. Never invent a metric, percentage, dollar figure, count, or any other number that \
+is not present in the raw description, even if it seems plausible or would make the bullet stronger. \
+3. Do NOT "improve" a bullet by adding a percentage or metric that wasn't in the raw input. A common \
+mistake is treating "make this more impressive" as license to attach a made-up number — resist that \
+urge completely. If the raw description has no number for something, write the concrete technical \
+action instead (what was built, migrated, fixed, or led) and leave it at that — an unquantified but \
+true bullet is correct output; a quantified but invented one is not. \
+4. If the raw description contains no numbers at all, your bullets must contain no numbers either. \
+5. You may reorder, rephrase, and emphasize parts of the raw description to better match the target \
+job description — but never add a capability, outcome, or fact that isn't in the raw description. \
+6. Each bullet should start with a strong action verb and be one sentence."""
 
 
 def profile_to_dict(
@@ -66,6 +109,8 @@ def profile_to_dict(
                 "location": e.location,
                 "dates": f"{e.start_date} - {e.end_date}",
                 "bullets": e.bullets,
+                "raw_description": e.raw_description,
+                "bullet_count": e.bullet_count,
             }
             for e in experience
             if e.entry_type != "internship"
@@ -77,6 +122,8 @@ def profile_to_dict(
                 "location": e.location,
                 "dates": f"{e.start_date} - {e.end_date}",
                 "bullets": e.bullets,
+                "raw_description": e.raw_description,
+                "bullet_count": e.bullet_count,
             }
             for e in experience
             if e.entry_type == "internship"
@@ -119,6 +166,15 @@ def build_scoring_prompt(
         f"{preference_block}\n\n"
         f"JOB:\nTitle: {job_title}\nCompany: {company_name}\nLocation: {location}\n\n"
         f"DESCRIPTION:\n{description[:6000]}"
+    )
+
+
+def build_bullet_generation_prompt(raw_description: str, bullet_count: int, job_title: str, description: str) -> str:
+    return (
+        f"RAW DESCRIPTION OF WHAT THE CANDIDATE DID (the only source of truth):\n{raw_description}\n\n"
+        f"NUMBER OF BULLETS TO WRITE: {bullet_count}\n\n"
+        f"TARGET JOB:\nTitle: {job_title}\n\nDESCRIPTION:\n{description[:4000]}\n\n"
+        f"Write {bullet_count} resume bullets now."
     )
 
 

@@ -1,58 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Companies · JobPilot{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Company Watchlist</h1>
+<h1 class="text-2xl font-bold tracking-tight mb-1">Company Watchlist</h1>
 <p class="text-sm text-slate-500 mb-6">Companies whose ATS job boards (Greenhouse, Lever, Ashby) JobPilot checks on each scan.</p>
 
-<section class="bg-white rounded-lg shadow p-5 mb-8">
-  <h2 class="font-semibold mb-3">Add a company</h2>
+<section class="card p-5 mb-6">
+  <h2 class="font-semibold mb-3 flex items-center gap-2"><span aria-hidden="true">➕</span> Add a company</h2>
   <form method="post" action="/companies" class="flex gap-3 items-end flex-wrap">
     <label class="block">
-      <span class="text-sm text-slate-600">Name</span>
-      <input name="name" required class="mt-1 border rounded px-3 py-2" />
+      <span class="text-xs font-medium text-slate-500">Name</span>
+      <input name="name" required class="input mt-1 px-3 py-2" />
     </label>
     <label class="block">
-      <span class="text-sm text-slate-600">ATS type</span>
-      <select name="ats_type" class="mt-1 border rounded px-3 py-2">
+      <span class="text-xs font-medium text-slate-500">ATS type</span>
+      <select name="ats_type" class="input mt-1 px-3 py-2">
         <option value="greenhouse">Greenhouse</option>
         <option value="lever">Lever</option>
         <option value="ashby">Ashby</option>
       </select>
     </label>
     <label class="block">
-      <span class="text-sm text-slate-600">Board slug</span>
-      <input name="ats_slug" required placeholder="e.g. company token from their board URL" class="mt-1 border rounded px-3 py-2 w-64" />
+      <span class="text-xs font-medium text-slate-500">Board slug</span>
+      <input name="ats_slug" required placeholder="e.g. company token from their board URL" class="input mt-1 px-3 py-2 w-64" />
     </label>
-    <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded font-medium">Add</button>
+    <button type="submit" class="btn btn-primary px-4 py-2">Add</button>
   </form>
 </section>
 
-<section class="bg-white rounded-lg shadow p-5">
+<section class="card p-5">
+  {% if companies %}
   <table class="w-full text-sm">
-    <thead class="text-left text-slate-500 border-b">
-      <tr><th class="py-2">Name</th><th>ATS</th><th>Slug</th><th>Enabled</th><th></th></tr>
+    <thead class="text-left text-slate-500 border-b border-slate-200">
+      <tr><th class="py-2 font-medium">Name</th><th class="font-medium">ATS</th><th class="font-medium">Slug</th><th class="font-medium">Status</th><th></th></tr>
     </thead>
     <tbody>
       {% for c in companies %}
-      <tr class="border-b last:border-0">
-        <td class="py-2">{{ c.name }}</td>
-        <td>{{ c.ats_type }}</td>
-        <td class="font-mono text-xs">{{ c.ats_slug }}</td>
-        <td>{{ "yes" if c.enabled else "no" }}</td>
-        <td class="space-x-2">
+      <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+        <td class="py-2.5 font-medium">{{ c.name }}</td>
+        <td class="text-slate-600">{{ c.ats_type }}</td>
+        <td class="font-mono text-xs text-slate-500">{{ c.ats_slug }}</td>
+        <td>
+          <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium {{ 'bg-emerald-100 text-emerald-700' if c.enabled else 'bg-slate-100 text-slate-500' }}">
+            {{ "enabled" if c.enabled else "disabled" }}
+          </span>
+        </td>
+        <td class="space-x-3 text-right">
           <form method="post" action="/companies/{{ c.id }}/toggle" class="inline">
-            <button class="text-blue-600 hover:underline">{{ "disable" if c.enabled else "enable" }}</button>
+            <button class="btn btn-ghost text-sm">{{ "disable" if c.enabled else "enable" }}</button>
           </form>
           <form method="post" action="/companies/{{ c.id }}/delete" class="inline">
-            <button class="text-red-600 hover:underline">remove</button>
+            <button class="text-red-600 hover:underline text-sm">remove</button>
           </form>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  {% if not companies %}
-  <p class="text-slate-500 text-sm">No companies yet — add one above.</p>
+  {% else %}
+  <div class="text-center py-10">
+    <div class="text-4xl mb-3" aria-hidden="true">🏢</div>
+    <p class="text-slate-500 text-sm">No companies yet — add one above to start tracking their openings.</p>
+  </div>
   {% endif %}
 </section>
 {% endblock %}

@@ -2,16 +2,26 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlmodel import select
 
 from jobpilot.auth import get_current_user
 from jobpilot.config import get_config
 from jobpilot.db import get_session
-from jobpilot.models import ApplicationStatus, Job, JobScore, Profile, ResumeDraft, User
-from jobpilot.pdf.render import render_resume_pdf
-from jobpilot.pipeline.tailor import load_profile_context, tailor_one_job
+from jobpilot.models import (
+    ApplicationEvent,
+    ApplicationStatus,
+    Job,
+    JobScore,
+    Profile,
+    ResumeDraft,
+    ScanLogEntry,
+    User,
+)
+from jobpilot.pdf.render import render_cover_letter_pdf, render_resume_pdf
+from jobpilot.pipeline.score import score_jobs
+from jobpilot.pipeline.tailor import get_score_threshold, load_profile_context, tailor_one_job
 from jobpilot.text_utils import split_bullet_lines, split_commas
 from jobpilot.web.templates_env import templates
 
@@ -37,6 +47,17 @@ def _get_owned_job(session, job_id: int, user_id: int) -> Job | None:
     return job
 
 
+SORT_OPTIONS = {
+    "score": "Fit score (high to low)",
+    "newest": "Date added (newest first)",
+    "oldest": "Date added (oldest first)",
+}
+
+
+def _is_stale(job: Job, stale_after_days: int, now: datetime) -> bool:
+    return (now - job.last_seen_at).days >= stale_after_days
+
+
 @router.get("/jobs")
 def jobs_list(
     request: Request,
@@ -44,11 +65,17 @@ def jobs_list(
     status: str = "",
     applied: str = "",
     remote_only: bool = False,
+    stale_only: bool = False,
     source: str = "",
     q: str = "",
     location: str = "",
+    sort: str = "score",
     user: User = Depends(get_current_user),
 ):
+    if sort not in SORT_OPTIONS:
+        sort = "score"
+    config = get_config()
+    now = datetime.utcnow()
     with get_session() as session:
         rows = session.exec(
             select(Job, JobScore, ApplicationStatus)
@@ -69,6 +96,8 @@ def jobs_list(
         rows = [r for r in rows if r[2] and r[2].status == applied]
     if remote_only:
         rows = [r for r in rows if r[0].is_remote]
+    if stale_only:
+        rows = [r for r in rows if _is_stale(r[0], config.stale_after_days, now)]
     if source:
         rows = [r for r in rows if r[0].source == source]
     if location:
@@ -77,7 +106,12 @@ def jobs_list(
         needle = q.lower()
         rows = [r for r in rows if needle in r[0].title.lower() or needle in r[0].company_name.lower()]
 
-    rows.sort(key=lambda r: (r[1].score if r[1] else -1), reverse=True)
+    if sort == "newest":
+        rows.sort(key=lambda r: r[0].collected_at, reverse=True)
+    elif sort == "oldest":
+        rows.sort(key=lambda r: r[0].collected_at)
+    else:
+        rows.sort(key=lambda r: (r[1].score if r[1] else -1), reverse=True)
 
     return templates.TemplateResponse(
         request,
@@ -88,19 +122,25 @@ def jobs_list(
             "status": status,
             "applied": applied,
             "remote_only": remote_only,
+            "stale_only": stale_only,
             "source": source,
             "q": q,
             "location": location,
+            "sort": sort,
+            "sort_options": SORT_OPTIONS,
             "all_sources": all_sources,
             "all_locations": all_locations,
             "current_url": str(request.url),
             "application_statuses": sorted(VALID_APPLICATION_STATUSES),
+            "now": now,
+            "stale_after_days": config.stale_after_days,
         },
     )
 
 
 @router.get("/jobs/{job_id}")
 def job_detail(request: Request, job_id: int, user: User = Depends(get_current_user)):
+    config = get_config()
     with get_session() as session:
         job = _get_owned_job(session, job_id, user.id)
         if job is None:
@@ -108,21 +148,95 @@ def job_detail(request: Request, job_id: int, user: User = Depends(get_current_u
         score = session.exec(select(JobScore).where(JobScore.job_id == job_id)).first()
         draft = _latest_draft(session, job_id)
         application = session.exec(select(ApplicationStatus).where(ApplicationStatus.job_id == job_id)).first()
+        score_threshold = get_score_threshold(session, config, user.id)
+        events = session.exec(
+            select(ApplicationEvent).where(ApplicationEvent.job_id == job_id).order_by(ApplicationEvent.created_at.desc())
+        ).all()
+        scan_log_entries = session.exec(
+            select(ScanLogEntry).where(ScanLogEntry.job_id == job_id).order_by(ScanLogEntry.created_at.desc())
+        ).all()
 
+    now = datetime.utcnow()
     return templates.TemplateResponse(
         request,
         "job_detail.html",
-        {"job": job, "score": score, "draft": draft, "application": application},
+        {
+            "job": job,
+            "score": score,
+            "draft": draft,
+            "application": application,
+            "score_threshold": score_threshold,
+            "events": events,
+            "scan_log_entries": scan_log_entries,
+            "now": now,
+            "stale_after_days": config.stale_after_days,
+            "is_stale": _is_stale(job, config.stale_after_days, now),
+        },
     )
 
 
+async def _regenerate_job_background(job_id: int, user_id: int) -> None:
+    """Runs after the triggering request has already returned — the request
+    handler only flips tailoring_in_progress on and redirects immediately,
+    since the tailoring model can take several minutes on this hardware and
+    there's no reason to hold the browser tab hostage for that. Always
+    clears the flag, even on failure, so the job never gets stuck showing
+    "Generating..." forever.
+    """
+    config = get_config()
+    with get_session() as session:
+        job = session.get(Job, job_id)
+        if job is None or job.user_id != user_id:
+            return
+        try:
+            await tailor_one_job(session, config, job, user_id)
+        finally:
+            job = session.get(Job, job_id)
+            job.tailoring_in_progress = False
+            session.add(job)
+            session.commit()
+
+
 @router.post("/jobs/{job_id}/regenerate")
-async def job_regenerate(job_id: int, user: User = Depends(get_current_user)):
+def job_regenerate(job_id: int, background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
+    with get_session() as session:
+        job = _get_owned_job(session, job_id, user.id)
+        if job is not None:
+            job.tailoring_in_progress = True
+            session.add(job)
+            session.commit()
+    background_tasks.add_task(_regenerate_job_background, job_id, user.id)
+    return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
+
+
+@router.get("/jobs/{job_id}/draft_status")
+def job_draft_status(request: Request, job_id: int, user: User = Depends(get_current_user)):
+    config = get_config()
+    with get_session() as session:
+        job = _get_owned_job(session, job_id, user.id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        score = session.exec(select(JobScore).where(JobScore.job_id == job_id)).first()
+        draft = _latest_draft(session, job_id)
+        score_threshold = get_score_threshold(session, config, user.id)
+    return templates.TemplateResponse(
+        request,
+        "job_draft_status.html",
+        {"job": job, "score": score, "draft": draft, "score_threshold": score_threshold},
+    )
+
+
+@router.post("/jobs/{job_id}/retry_score")
+async def job_retry_score(job_id: int, user: User = Depends(get_current_user)):
+    """Manual on-demand retry for a job stuck in needs_review (or never
+    scored at all) — the same score_jobs() the scan pipeline uses, run
+    immediately for just this one job rather than waiting for the next scan.
+    """
     config = get_config()
     with get_session() as session:
         job = _get_owned_job(session, job_id, user.id)
         if job is not None:
-            await tailor_one_job(session, config, job, user.id)
+            await score_jobs(session, config, [job], user.id)
     return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
 
 
@@ -138,6 +252,7 @@ async def job_save_draft(request: Request, job_id: int, user: User = Depends(get
             return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
 
         draft.summary = form.get("summary", draft.summary)
+        draft.cover_letter = form.get("cover_letter", draft.cover_letter)
         draft.experience = _parse_experience_rows(form, prefix="exp")
         draft.internships = _parse_experience_rows(form, prefix="intern")
 
@@ -169,6 +284,21 @@ async def job_save_draft(request: Request, job_id: int, user: User = Depends(get
                 output_path=pdf_path,
             )
             draft.pdf_path = str(pdf_path)
+
+            if draft.cover_letter.strip():
+                cl_pdf_path = (
+                    Path(draft.cover_letter_pdf_path)
+                    if draft.cover_letter_pdf_path
+                    else config.resume_dir_abs_path / f"job_{job_id}_v{draft.version}_cover_letter.pdf"
+                )
+                render_cover_letter_pdf(
+                    profile=profile,
+                    company_name=job.company_name,
+                    cover_letter=draft.cover_letter,
+                    output_path=cl_pdf_path,
+                )
+                draft.cover_letter_pdf_path = str(cl_pdf_path)
+
             session.add(draft)
             session.commit()
 
@@ -197,10 +327,10 @@ def _parse_experience_rows(form, *, prefix: str) -> list[dict]:
     return rows
 
 
-def _resume_filename(full_name: str) -> str:
+def _resume_filename(full_name: str, *, suffix: str = "Resume") -> str:
     base = re.sub(r"[^\w\s-]", "", full_name or "").strip()
     base = re.sub(r"\s+", "_", base)
-    return f"{base}_Resume.pdf" if base else "Resume.pdf"
+    return f"{base}_{suffix}.pdf" if base else f"{suffix}.pdf"
 
 
 @router.get("/jobs/{job_id}/pdf")
@@ -223,6 +353,26 @@ def job_pdf(job_id: int, view: bool = False, user: User = Depends(get_current_us
     )
 
 
+@router.get("/jobs/{job_id}/cover-letter/pdf")
+def job_cover_letter_pdf(job_id: int, view: bool = False, user: User = Depends(get_current_user)):
+    with get_session() as session:
+        job = _get_owned_job(session, job_id, user.id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        draft = _latest_draft(session, job_id)
+        profile = session.exec(select(Profile).where(Profile.user_id == user.id)).first()
+    if draft is None or not draft.cover_letter_pdf_path or not Path(draft.cover_letter_pdf_path).exists():
+        return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
+
+    filename = _resume_filename(profile.full_name if profile else "", suffix="Cover_Letter")
+    disposition = "inline" if view else "attachment"
+    return FileResponse(
+        draft.cover_letter_pdf_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+    )
+
+
 @router.post("/jobs/{job_id}/apply")
 def job_mark_applied(job_id: int, user: User = Depends(get_current_user)):
     with get_session() as session:
@@ -236,6 +386,7 @@ def job_mark_applied(job_id: int, user: User = Depends(get_current_user)):
         application.applied_at = datetime.utcnow()
         application.updated_at = datetime.utcnow()
         session.add(application)
+        session.add(ApplicationEvent(job_id=job_id, kind="status_change", text="Status changed to applied"))
         session.commit()
     return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
 
@@ -257,14 +408,31 @@ async def job_set_status(request: Request, job_id: int, user: User = Depends(get
             application = session.exec(select(ApplicationStatus).where(ApplicationStatus.job_id == job_id)).first()
             if application is None:
                 application = ApplicationStatus(job_id=job_id)
+            status_changed = application.status != new_status
             application.status = new_status
             if new_status == "applied" and application.applied_at is None:
                 application.applied_at = datetime.utcnow()
             application.updated_at = datetime.utcnow()
             session.add(application)
+            if status_changed:
+                session.add(ApplicationEvent(
+                    job_id=job_id, kind="status_change", text=f"Status changed to {new_status.replace('_', ' ')}"
+                ))
             session.commit()
 
     return RedirectResponse(url=return_to, status_code=303)
+
+
+@router.post("/jobs/{job_id}/notes")
+async def job_add_note(request: Request, job_id: int, user: User = Depends(get_current_user)):
+    form = await request.form()
+    note = form.get("note", "").strip()
+    with get_session() as session:
+        job = _get_owned_job(session, job_id, user.id)
+        if job is not None and note:
+            session.add(ApplicationEvent(job_id=job_id, kind="note", text=note))
+            session.commit()
+    return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
 
 
 @router.post("/jobs/delete")
@@ -285,12 +453,24 @@ async def jobs_bulk_delete(request: Request, user: User = Depends(get_current_us
                     pdf_file = Path(draft.pdf_path)
                     if pdf_file.exists():
                         pdf_file.unlink()
+                if draft.cover_letter_pdf_path:
+                    cl_pdf_file = Path(draft.cover_letter_pdf_path)
+                    if cl_pdf_file.exists():
+                        cl_pdf_file.unlink()
                 session.delete(draft)
 
             for score in session.exec(select(JobScore).where(JobScore.job_id == job_id)).all():
                 session.delete(score)
             for application in session.exec(select(ApplicationStatus).where(ApplicationStatus.job_id == job_id)).all():
                 session.delete(application)
+            for event in session.exec(select(ApplicationEvent).where(ApplicationEvent.job_id == job_id)).all():
+                session.delete(event)
+            # Unlink rather than delete: the log lines themselves are still
+            # part of that scan's permanent record even after this job row
+            # is gone — only the "which job" tag on them goes stale.
+            for log_entry in session.exec(select(ScanLogEntry).where(ScanLogEntry.job_id == job_id)).all():
+                log_entry.job_id = None
+                session.add(log_entry)
 
             session.delete(job)
 

@@ -17,3 +17,5 @@ class ResumeDraft(SQLModel, table=True):
     generated_at: datetime = Field(default_factory=datetime.utcnow)
     edited_manually: bool = False
     pdf_path: str = ""
+    cover_letter: str = ""
+    cover_letter_pdf_path: str = ""

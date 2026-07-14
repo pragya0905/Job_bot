@@ -26,6 +26,14 @@ def fetch_lever_jobs(company_name: str, company_slug: str) -> list[RawJob]:
             f"{lst.get('text', '')}\n" + html_to_text(lst.get("content", ""))
             for lst in item.get("lists", [])
         )
+        # Best-effort only: salaryRange is a documented but opt-in Lever
+        # field (pay-transparency accounts only) — most postings won't have
+        # it, so this is expected to be empty far more often than not.
+        salary_range = item.get("salaryRange") or {}
+        salary_raw = ""
+        if salary_range.get("min") and salary_range.get("max"):
+            currency = salary_range.get("currency", "")
+            salary_raw = f"{currency} {salary_range['min']:,} - {salary_range['max']:,}".strip()
         jobs.append(
             RawJob(
                 source="lever",
@@ -36,6 +44,7 @@ def fetch_lever_jobs(company_name: str, company_slug: str) -> list[RawJob]:
                 is_remote=bool(is_remote),
                 url=item.get("hostedUrl", ""),
                 description_text=f"{description}\n\n{lists_text}".strip(),
+                salary_raw=salary_raw,
             )
         )
     return jobs
